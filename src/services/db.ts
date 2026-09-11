@@ -715,6 +715,30 @@ class DatabaseService {
   }
 
   // --- Videos & Feed ---
+  private getSearchHistory(userId: string): string[] {
+    return getStored<string[]>('search_history_' + userId, []);
+  }
+
+  public recordSearch(term: string) {
+    const cur = this.getCurrentUser();
+    const clean = term.toLowerCase().trim().slice(0, 80);
+    if (!clean) return;
+    const history = this.getSearchHistory(cur.id).filter(item => item !== clean);
+    history.unshift(clean);
+    setStored('search_history_' + cur.id, history.slice(0, 30));
+    this.notify();
+  }
+
+  public getSearchHistoryForCurrentUser(): string[] {
+    return this.getSearchHistory(this.getCurrentUser().id);
+  }
+
+  public clearSearchHistory() {
+    const cur = this.getCurrentUser();
+    setStored('search_history_' + cur.id, []);
+    this.notify();
+  }
+
   public getVideos(tab: 'foryou' | 'following' | 'trending' | 'new' | 'premium' = 'foryou'): Video[] {
     const cur = this.getCurrentUser();
     const creatorMap = new Map(this.creators.map(c => [c.id, c]));
@@ -743,13 +767,16 @@ class DatabaseService {
     this.subscriptions.forEach(s => creatorSubs.set(s.creator_id, (creatorSubs.get(s.creator_id) || 0) + 1));
     this.purchases.forEach(p => creatorPurchases.set(p.creator_id, (creatorPurchases.get(p.creator_id) || 0) + 1));
     const now = Date.now();
+    const searchHistory = this.getSearchHistory(cur.id);
     const score = (v: Video) => {
       const ageHours = Math.max(1, (now - new Date(v.created_at).getTime()) / 3600000);
       const freshness = Math.max(0, 72 - ageHours) / 72;
       const creator = creatorMap.get(v.creator_id);
       const popularity = Math.log1p(v.views_count) * 1.0 + Math.log1p(v.likes_count) * 3.0 + Math.log1p(v.comments_count) * 2.5 + Math.log1p(v.favorites_count) * 2.0;
       const businessSignal = (creatorSubs.get(v.creator_id) || 0) * 2.5 + (creatorPurchases.get(v.creator_id) || 0) * 3.0;
-      const personal = (v.has_liked ? 2 : 0) + (v.has_favorited ? 2 : 0) + (activeSubs.has(v.creator_id) ? 6 : 0) + (followedCreators.has(v.creator_id) ? 4 : 0);
+      const searchable = [v.title, v.description, v.category, ...(v.hashtags || []), creator?.display_name || '', creator?.handle || ''].join(' ').toLowerCase();
+      const searchAffinity = searchHistory.reduce((total, term) => total + (searchable.includes(term) ? 3 : 0), 0);
+      const personal = (v.has_liked ? 2 : 0) + (v.has_favorited ? 2 : 0) + (activeSubs.has(v.creator_id) ? 6 : 0) + (followedCreators.has(v.creator_id) ? 4 : 0) + searchAffinity;
       const quality = creator?.verified ? 1.5 : 0;
       return popularity + businessSignal + freshness * 8 + personal + quality;
     };
