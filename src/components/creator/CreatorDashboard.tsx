@@ -19,6 +19,7 @@ import {
 import { Creator, Video, Withdrawal } from '../../types';
 import { dbService } from '../../services/db';
 import { useAuth } from '../../hooks/useAuth';
+import { CreatorAnalyticsPanel } from './CreatorAnalyticsPanel';
 
 interface CreatorDashboardProps {
   onOpenUpload: () => void;
@@ -215,6 +216,8 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
           <span className="text-[10px] text-zinc-500">{(creator.total_likes).toLocaleString('pt-BR')} curtidas</span>
         </div>
       </div>
+
+      <CreatorAnalyticsPanel creatorId={creator.id} fallback={{ followers: creator.total_followers, views: creator.total_views, likes: creator.total_likes, comments: 0, earnings: creator.total_earnings || 0 }} />
 
       {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-zinc-800 pb-3 mb-6 overflow-x-auto no-scrollbar">
