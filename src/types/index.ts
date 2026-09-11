@@ -13,6 +13,7 @@ export interface User {
   is_blocked?: boolean;
   is_suspended?: boolean;
   wallet_balance: number; // R$
+  platform_plan_slug?: 'gratis' | 'plus' | 'vip';
   created_at: string;
 }
 
