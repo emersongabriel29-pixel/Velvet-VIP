@@ -46,7 +46,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const { currentUser, currentCreator, updateProfile } = useAuth();
   const [creator, setCreator] = useState<Creator | undefined>(undefined);
   const [videos, setVideos] = useState<Video[]>([]);
-  const [activeTab, setActiveTab] = useState<'all' | 'free' | 'vip' | 'favorites'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'free' | 'vip' | 'long' | 'favorites'>('all');
   const [isFollowing, setIsFollowing] = useState(false);
   const [subscribeModalOpen, setSubscribeModalOpen] = useState(false);
   const [isEditingBio, setIsEditingBio] = useState(false);
@@ -95,6 +95,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const displayedVideos = videos.filter((v) => {
     if (activeTab === 'free') return !v.is_premium;
     if (activeTab === 'vip') return v.is_premium;
+    if (activeTab === 'long') return v.duration_seconds >= 60;
     return true;
   });
 
