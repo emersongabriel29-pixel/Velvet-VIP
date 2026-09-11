@@ -20,6 +20,7 @@ import { Creator, Video, Withdrawal } from '../../types';
 import { dbService } from '../../services/db';
 import { useAuth } from '../../hooks/useAuth';
 import { CreatorAnalyticsPanel } from './CreatorAnalyticsPanel';
+import { CreatorPlansManager } from './CreatorPlansManager';
 
 interface CreatorDashboardProps {
   onOpenUpload: () => void;
@@ -218,6 +219,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
       </div>
 
       <CreatorAnalyticsPanel creatorId={creator.id} fallback={{ followers: creator.total_followers, views: creator.total_views, likes: creator.total_likes, comments: 0, earnings: creator.total_earnings || 0 }} />
+      <CreatorPlansManager creatorId={creator.id} />
 
       {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-zinc-800 pb-3 mb-6 overflow-x-auto no-scrollbar">
