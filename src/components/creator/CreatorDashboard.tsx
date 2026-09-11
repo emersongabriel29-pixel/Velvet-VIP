@@ -63,6 +63,9 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
     created_at: new Date().toISOString(),
   };
 
+  const creatorLevel = Math.max(1, Math.floor((creator.total_earnings || 0) / 1000) + 1);
+  const nextLevelTarget = creatorLevel * 1000;
+
   const loadData = () => {
     if (creator.id) {
       setVideos(dbService.getVideosByCreator(creator.id));
@@ -116,6 +119,13 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
 
   return (
     <div className="min-h-screen bg-[#09090b] text-white pt-16 pb-20 max-w-5xl mx-auto px-4 sm:px-6">
+      {/* Progression and earnings */}
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-950/10 p-4"><p className="text-xs text-zinc-500">Nível do criador</p><p className="mt-1 text-2xl font-black text-amber-300">Nível {creatorLevel}</p><p className="mt-1 text-xs text-zinc-400">Próximo marco: R$ {nextLevelTarget.toFixed(2).replace('.', ',')}</p></div>
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4"><p className="text-xs text-zinc-500">Ganhos confirmados</p><p className="mt-1 text-2xl font-black">R$ {(creator.total_earnings || 0).toFixed(2).replace('.', ',')}</p><p className="mt-1 text-xs text-zinc-400">Somente pagamentos aprovados</p></div>
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/10 p-4"><p className="text-xs text-zinc-500">Saldo disponível</p><p className="mt-1 text-2xl font-black text-emerald-300">R$ {(creator.available_balance || 0).toFixed(2).replace('.', ',')}</p><p className="mt-1 text-xs text-zinc-400">Elegível para saque conforme regras</p></div>
+      </div>
+
       {/* Studio Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-zinc-800">
         <div>
