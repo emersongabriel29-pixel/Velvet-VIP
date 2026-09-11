@@ -201,6 +201,14 @@ export type ReportReason =
   | 'spam'
   | 'inappropriate_content'
   | 'underage_suspicion'
+  | 'hate_speech'
+  | 'racism'
+  | 'threat'
+  | 'harassment'
+  | 'sexual_harassment'
+  | 'non_consensual'
+  | 'privacy'
+  | 'copyright'
   | 'other';
 
 export interface Report {
