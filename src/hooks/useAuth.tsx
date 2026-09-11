@@ -42,6 +42,7 @@ function mapProfile(profile: any, email = ''): User {
     is_blocked: Boolean(profile.is_blocked),
     is_suspended: Boolean(profile.is_suspended),
     wallet_balance: Number(profile.wallet_balance || 0),
+    platform_plan_slug: profile.platform_plan_slug || profile.platform_plan?.slug || 'gratis',
     created_at: profile.created_at,
   };
 }
@@ -59,6 +60,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
     if (error || !data) return null;
     const mapped = mapProfile(data, email || '');
+    if (supabase && data.platform_plan_id) {
+      const { data: plan } = await supabase.from('platform_plans').select('slug').eq('id', data.platform_plan_id).maybeSingle();
+      if (plan?.slug === 'gratis' || plan?.slug === 'plus' || plan?.slug === 'vip') mapped.platform_plan_slug = plan.slug;
+    }
     setCurrentUser(mapped);
     setIsAuthenticated(true);
     const { data: creator } = await supabase.from('creators').select('*').eq('user_id', userId).maybeSingle();
