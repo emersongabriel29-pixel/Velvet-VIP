@@ -17,7 +17,7 @@ import {
 } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
-const STORAGE_KEY_PREFIX = 'velvet_vip_db_v1_';
+const STORAGE_KEY_PREFIX = 'velvet_vip_db_v2_';
 
 function getStored<T>(key: string, defaultVal: T): T {
   try {
