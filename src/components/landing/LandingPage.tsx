@@ -36,7 +36,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenUplo
     },
     {
       q: 'Posso publicar vídeos como criador imediatamente?',
-      a: 'Sim! Qualquer usuário pode alternar para o modo criador, preencher os dados de perfil e publicar vídeos verticais definindo se são gratuitos ou VIPs.',
+      a: 'Qualquer usuário maior de idade pode solicitar o modo criador, mas precisa concluir a verificação de identidade, aceitar as regras de consentimento e aguardar a aprovação antes de publicar.',
     },
   ];
 
