@@ -167,7 +167,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
   return (
     <div key={video.id} className="w-full min-h-full snap-start">
       {showAds && <AdBanner compact />}
-      <div className="w-full h-full flex items-center justify-center"> className="w-full h-full flex items-center justify-center snap-start">
+      <div className="w-full h-full flex items-center justify-center">
                 {isNear ? (
                   <VideoCard
                     video={video}
