@@ -51,7 +51,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
           type="text"
           placeholder="Buscar vídeos, criadores ou #hashtags..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => { setSearchTerm(e.target.value); if (e.target.value.trim().length >= 3) dbService.recordSearch(e.target.value); }}
           className="w-full pl-12 pr-4 py-3.5 bg-[#141419] border border-zinc-800 rounded-2xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-rose-500 transition-colors shadow-lg"
         />
       </div>
