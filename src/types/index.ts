@@ -36,6 +36,7 @@ export interface Creator {
   wallet_balance?: number;
   total_earnings?: number;
   category: string;
+  identity_status?: 'pending' | 'verified' | 'rejected' | 'suspended';
   created_at: string;
 }
 
@@ -59,6 +60,9 @@ export interface Video {
   favorites_count: number;
   is_draft: boolean;
   is_removed: boolean;
+  moderation_status?: 'pending' | 'approved' | 'rejected' | 'removed';
+  moderation_notes?: string;
+  consent_confirmed?: boolean;
   created_at: string;
   // Dynamic runtime properties for current user
   creator?: Creator;
