@@ -23,6 +23,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
   onTagClick,
   onOpenUpload,
 }) => {
+  const { currentUser } = useAuth();
   const [videos, setVideos] = useState<Video[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
