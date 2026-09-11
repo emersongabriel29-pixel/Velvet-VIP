@@ -60,6 +60,8 @@ CREATE TABLE IF NOT EXISTS public.live_sessions (
   ended_at TIMESTAMPTZ,
   status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled','live','ended','cancelled')),
   moderation_status TEXT NOT NULL DEFAULT 'pending' CHECK (moderation_status IN ('pending','approved','blocked')),
+  required_plan TEXT NOT NULL DEFAULT 'plus' CHECK (required_plan IN ('plus','vip')),
+  access_price NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (access_price >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
