@@ -43,7 +43,8 @@ Em um projeto Supabase novo, execute nesta ordem:
 8. `supabase/007_progression_referrals.sql`
 9. `supabase/008_creator_plans.sql`
 10. `supabase/009_safety_moderation.sql
-- `010_payment_events.sql` — sessões de checkout e idempotência de webhooks`
+- `010_payment_events.sql
+- `011_moderation_enforcement.sql` — enforcement server-side e revisão de uploads` — sessões de checkout e idempotência de webhooks`
 
 A segunda migração endurece RLS e impede alterações client-side em campos financeiros/administrativos. A terceira cria o provisionamento de perfil após signup, ledger financeiro, idempotência de webhooks, auditoria e bucket privado de mídia.
 
