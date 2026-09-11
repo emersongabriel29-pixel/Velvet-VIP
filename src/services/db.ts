@@ -1279,6 +1279,28 @@ class DatabaseService {
     this.notify();
   }
 
+  // --- Monetization helpers ---
+  public getPlatformPlans() {
+    return [
+      { id: 'plan-free', name: 'Grátis', slug: 'gratis', monthly_price: 0, ads_enabled: true, benefits: ['Feed com anúncios', 'Recursos essenciais'], is_active: true },
+      { id: 'plan-plus', name: 'Plus', slug: 'plus', monthly_price: 19.90, ads_enabled: false, benefits: ['Sem anúncios', 'Filtros avançados', 'Mais favoritos'], is_active: true },
+      { id: 'plan-vip', name: 'VIP', slug: 'vip', monthly_price: 39.90, ads_enabled: false, benefits: ['Sem anúncios', 'Acesso antecipado', 'Descontos e gorjetas destacadas'], is_active: true },
+    ];
+  }
+
+  public sendTip(creatorId: string, amount: number, message = '') {
+    const cur = this.getCurrentUser();
+    const creator = this.getCreatorById(creatorId);
+    if (!creator) throw new Error('Criador não encontrado');
+    if (!Number.isFinite(amount) || amount < 1) throw new Error('A gorjeta mínima é de R$ 1,00');
+    if (cur.wallet_balance < amount) throw new Error('Saldo insuficiente. Adicione créditos antes de enviar a gorjeta.');
+    const creatorAmount = Number((amount * 0.90).toFixed(2));
+    this.updateUser(cur.id, { wallet_balance: cur.wallet_balance - amount });
+    this.updateCreator(creatorId, { available_balance: creator.available_balance + creatorAmount, gross_earnings: creator.gross_earnings + amount });
+    this.addNotification({ user_id: creator.user_id, sender_id: cur.id, sender_name: cur.name, sender_avatar: cur.avatar_url, type: 'payout', title: 'Você recebeu uma gorjeta', message: 'Um fã enviou uma gorjeta de R$ ' + amount.toFixed(2).replace('.', ',') + '.', target_id: creatorId });
+    return { id: 'tip-' + Date.now(), sender_id: cur.id, creator_id: creatorId, amount, platform_fee: Number((amount * 0.10).toFixed(2)), creator_amount: creatorAmount, message, status: 'paid' as const, created_at: new Date().toISOString() };
+  }
+
   // --- Notifications ---
   public getNotifications(): Notification[] {
     const cur = this.getCurrentUser();
