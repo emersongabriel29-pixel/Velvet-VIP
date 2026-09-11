@@ -18,6 +18,7 @@ import { SupabaseConfigModal } from './components/supabase/SupabaseConfigModal';
 import { AuthModalV2 as AuthModal } from './components/auth/AuthModalV2';
 import { LgpdTermsModal } from './components/legal/LgpdTermsModal';
 import { MonetizationPage } from './components/monetization/MonetizationPage';
+import { LivePage } from './components/live/LivePage';
 
 const VelvetVipApp: React.FC = () => {
   const { hasConsented18Plus } = useAuth();
@@ -38,6 +39,7 @@ const VelvetVipApp: React.FC = () => {
     <AgeVerificationModal />
     <Header currentTab={currentTab} onTabChange={(tab) => { setCurrentTab(tab); setActiveView('feed'); }} activeView={activeView} onViewChange={(view) => view === 'profile' ? handleOpenProfile() : setActiveView(view)} onOpenSupabaseModal={() => setSupabaseModalOpen(true)} onOpenWalletModal={() => setWalletModalOpen(true)} onOpenLanding={() => setActiveView('landing')} onOpenAuthModal={() => setAuthModalOpen(true)} onOpenLgpdModal={() => setLgpdModalOpen(true)} />
     <main className="w-full">
+      {activeView !== 'landing' && <button onClick={() => setActiveView('live')} className="fixed right-4 top-32 z-30 rounded-full border border-emerald-500/40 bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-lg hover:bg-emerald-500">Lives</button>
       {activeView !== 'landing' && <button onClick={() => setActiveView('monetization')} className="fixed right-4 top-20 z-30 rounded-full border border-rose-500/40 bg-rose-600 px-3 py-2 text-xs font-bold text-white shadow-lg hover:bg-rose-500">Planos e ganhos</button>
       {activeView === 'feed' && <VideoFeed currentTab={currentTab} onSelectCreator={handleSelectCreator} onOpenUpload={() => setUploadModalOpen(true)} />}
       {activeView === 'explore' && <ExplorePage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} />}
@@ -46,6 +48,7 @@ const VelvetVipApp: React.FC = () => {
       {activeView === 'creator_studio' && <CreatorDashboard onOpenUpload={() => setUploadModalOpen(true)} onSelectVideo={handleSelectVideo} />}
       {activeView === 'purchases' && <MyPurchasesPage onSelectVideo={handleSelectVideo} onBack={() => setActiveView('profile')} />}
       {activeView === 'admin' && <AdminPanel onSelectVideo={handleSelectVideo} />}
+      {activeView === 'live' && <LivePage onBack={() => setActiveView('feed')} />}
       {activeView === 'monetization' && <MonetizationPage onBack={() => setActiveView('feed')} />}
       {activeView === 'landing' && <LandingPage onEnterApp={() => setActiveView('feed')} onOpenUpload={() => setUploadModalOpen(true)} />}
     </main>
