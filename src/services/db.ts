@@ -738,22 +738,38 @@ class DatabaseService {
         };
       });
 
+    const creatorSubs = new Map<string, number>();
+    const creatorPurchases = new Map<string, number>();
+    this.subscriptions.forEach(s => creatorSubs.set(s.creator_id, (creatorSubs.get(s.creator_id) || 0) + 1));
+    this.purchases.forEach(p => creatorPurchases.set(p.creator_id, (creatorPurchases.get(p.creator_id) || 0) + 1));
+    const now = Date.now();
+    const score = (v: Video) => {
+      const ageHours = Math.max(1, (now - new Date(v.created_at).getTime()) / 3600000);
+      const freshness = Math.max(0, 72 - ageHours) / 72;
+      const creator = creatorMap.get(v.creator_id);
+      const popularity = Math.log1p(v.views_count) * 1.0 + Math.log1p(v.likes_count) * 3.0 + Math.log1p(v.comments_count) * 2.5 + Math.log1p(v.favorites_count) * 2.0;
+      const businessSignal = (creatorSubs.get(v.creator_id) || 0) * 2.5 + (creatorPurchases.get(v.creator_id) || 0) * 3.0;
+      const personal = (v.has_liked ? 2 : 0) + (v.has_favorited ? 2 : 0) + (activeSubs.has(v.creator_id) ? 6 : 0) + (followedCreators.has(v.creator_id) ? 4 : 0);
+      const quality = creator?.verified ? 1.5 : 0;
+      return popularity + businessSignal + freshness * 8 + personal + quality;
+    };
+
     switch (tab) {
       case 'following':
         list = list.filter(v => followedCreators.has(v.creator_id));
         break;
       case 'trending':
-        list = [...list].sort((a, b) => (b.views_count + b.likes_count * 2) - (a.views_count + a.likes_count * 2));
+        list = [...list].sort((a, b) => score(b) - score(a));
         break;
       case 'new':
         list = [...list].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         break;
       case 'premium':
-        list = list.filter(v => v.is_premium);
+        list = list.filter(v => v.is_premium).sort((a, b) => score(b) - score(a));
         break;
       case 'foryou':
       default:
-        // FYP algorithm: mixes recent, high interactions, and unwatched
+        list = [...list].sort((a, b) => score(b) - score(a));
         break;
     }
 
