@@ -1,15 +1,13 @@
 # Velvet VIP
 
-Plataforma web de vídeos verticais com perfis de criadores, feed, exploração, assinaturas, compras, carteira, moderação e integração opcional com Supabase.
+Plataforma web de vídeos verticais 18+ com feed, criadores, exploração, assinaturas, compras, carteira, denúncias, administração e pagamentos.
 
-## Estado atual
+## Arquitetura
 
-O projeto possui duas camadas:
-
-- **Modo local/demo:** dados persistidos no navegador para desenvolvimento e prototipação.
-- **Supabase:** autenticação, PostgreSQL e RLS para ambiente real.
-
-> O modo local não deve ser usado como mecanismo de autenticação ou cobrança em produção.
+- **Frontend:** React + Vite + TypeScript + Tailwind.
+- **Produção:** Supabase Auth + PostgreSQL + RLS + Storage privado + Edge Functions.
+- **Pagamentos:** Mercado Pago Checkout Pro, com preferência criada no servidor e confirmação por webhook assinado.
+- **Demo:** quando Supabase não está configurado, o app mantém o modo local para prototipação. Esse modo não é autenticação real e não deve processar dinheiro.
 
 ## Desenvolvimento
 
@@ -20,32 +18,90 @@ npm run build
 npm run dev
 ```
 
-## Variáveis de ambiente
+## Configuração do frontend
 
-Copie `.env.example` para `.env.local` e configure:
+Copie `.env.example` para `.env.local` e preencha:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
-- `GEMINI_API_KEY` quando os recursos de IA forem utilizados
-- `APP_URL` quando houver backend/callbacks
+- `APP_URL`
+- `GEMINI_API_KEY` somente se as funções de IA forem utilizadas
 
-Nunca publique `service_role`, chaves privadas de gateway ou outros segredos no frontend.
+Nunca coloque `SUPABASE_SERVICE_ROLE_KEY`, `MERCADOPAGO_ACCESS_TOKEN` ou `MERCADOPAGO_WEBHOOK_SECRET` em variáveis `VITE_*`.
 
-## Supabase
+## Banco Supabase
 
-Execute `supabase/schema.sql` em um projeto novo e revise as políticas RLS antes de colocar dados reais em produção.
+Em um projeto Supabase novo, execute nesta ordem:
 
-A camada de pagamentos deve ser processada no servidor/Edge Function e confirmada por webhook do provedor. O navegador nunca deve alterar saldo, pagamento, saque ou comissão diretamente.
+1. `supabase/schema.sql`
+2. `supabase/001_hardening.sql`
+3. `supabase/002_production.sql`
 
-## Checklist de produção
+A segunda migração endurece RLS e impede alterações client-side em campos financeiros/administrativos. A terceira cria o provisionamento de perfil após signup, ledger financeiro, idempotência de webhooks, auditoria e bucket privado de mídia.
 
-- [ ] Supabase configurado
-- [ ] RLS revisado e testado com usuários anônimo/autenticado/criador/admin
-- [ ] Gateway de pagamento configurado no backend
-- [ ] Webhooks idempotentes
-- [ ] Storage privado para conteúdo pago + URLs assinadas
-- [ ] Moderação e fluxo de denúncias ativos
-- [ ] Política de privacidade, termos e retenção de dados revisados juridicamente
-- [ ] Monitoramento, logs e alertas configurados
-- [ ] Backup e recuperação do banco testados
-- [ ] Build e typecheck passando em CI
+O signup real exige data de nascimento de maioridade; a trigger de banco valida 18+ antes de criar o perfil.
+
+## Edge Functions
+
+Funções incluídas:
+
+- `create-payment-preference`: valida a sessão, valida o item/preço no banco e cria uma preferência do Mercado Pago no servidor.
+- `mercadopago-webhook`: valida `x-signature` via HMAC-SHA256, registra eventos de forma idempotente e liquida compra/assinatura/crédito.
+- `get-video-url`: valida 18+, compra/assinatura e entrega URL assinada para mídia privada.
+
+Configure os secrets no Supabase, não no frontend:
+
+```bash
+supabase secrets set MERCADOPAGO_ACCESS_TOKEN=...
+supabase secrets set MERCADOPAGO_WEBHOOK_SECRET=...
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY=...
+supabase secrets set APP_URL=https://seu-dominio.com
+supabase secrets set CREATOR_SHARE_PERCENT=85
+```
+
+Depois, faça o deploy das funções:
+
+```bash
+supabase functions deploy create-payment-preference
+supabase functions deploy mercadopago-webhook --no-verify-jwt
+supabase functions deploy get-video-url
+```
+
+No painel do Mercado Pago, configure o webhook de pagamentos apontando para:
+
+`https://SEU-PROJETO.supabase.co/functions/v1/mercadopago-webhook`
+
+Use HTTPS e a chave secreta gerada pelo Mercado Pago para `MERCADOPAGO_WEBHOOK_SECRET`.
+
+## Mídia
+
+Conteúdo premium novo deve ser enviado para o bucket privado `velvet-media`. Em `videos.video_url`, use `storage://caminho/do/arquivo.mp4`. A função `get-video-url` converte esse caminho em URL assinada temporária depois de verificar a autorização.
+
+Não publique originais pagos em buckets públicos.
+
+## Segurança financeira
+
+O navegador não pode editar `wallet_balance`, comissão, `creator_balance`, pagamentos ou saques. Alterações financeiras são realizadas por código confiável/server-side. O ledger fornece rastreabilidade e `webhook_events` impede processamento duplicado do mesmo evento externo.
+
+## CI
+
+O workflow `.github/workflows/ci.yml` executa `npm install`, `npm run typecheck` e `npm run build` em pushes/PRs para `main`.
+
+## Checklist antes de abrir para o público
+
+- [ ] Configurar Supabase real e executar as três migrations.
+- [ ] Configurar Auth, domínio e e-mails de confirmação/reset.
+- [ ] Configurar secrets das Edge Functions.
+- [ ] Criar aplicação Mercado Pago e configurar webhook assinado.
+- [ ] Testar pagamento aprovado, pendente, rejeitado e reenvio do mesmo webhook.
+- [ ] Testar compra, assinatura, depósito e saldo do criador.
+- [ ] Configurar Storage privado e testar URL assinada/expiração.
+- [ ] Revisar RLS com anon, usuário, criador e admin.
+- [ ] Configurar moderação, denúncias, bloqueios e auditoria.
+- [ ] Revisar LGPD, termos 18+, retenção e política de conteúdo com profissional jurídico.
+- [ ] Configurar domínio HTTPS, monitoramento, backups e alertas.
+- [ ] Rodar typecheck/build e testes de navegador antes do lançamento.
+
+## Importante
+
+A integração de pagamento está preparada no código, mas **credenciais de produção, configuração da conta Mercado Pago, domínio HTTPS, secrets do Supabase e execução das migrations precisam ser feitos no projeto/contas reais**. Sem essas etapas externas, não existe cobrança real apenas por publicar o repositório.
