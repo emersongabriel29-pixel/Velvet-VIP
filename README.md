@@ -105,3 +105,12 @@ O workflow `.github/workflows/ci.yml` executa `npm install`, `npm run typecheck`
 ## Importante
 
 A integração de pagamento está preparada no código, mas **credenciais de produção, configuração da conta Mercado Pago, domínio HTTPS, secrets do Supabase e execução das migrations precisam ser feitos no projeto/contas reais**. Sem essas etapas externas, não existe cobrança real apenas por publicar o repositório.
+
+
+## Catálogo e moderação
+
+A plataforma utiliza catálogo de categorias e tags com foco em conteúdo adulto consensual. Termos que possam indicar menores de idade, incesto, abuso, coerção ou ausência de consentimento são proibidos e devem ser bloqueados na publicação.
+
+Antes do lançamento, configure verificação real de identidade e maioridade dos criadores, revisão de uploads, denúncias prioritárias, remoção rápida, proteção contra redistribuição de mídia e auditoria de acesso. A confirmação de idade por checkbox, isoladamente, não é suficiente para operação comercial.
+
+O modo local é somente demonstração. Ele não deve ser usado para autenticação, pagamentos ou armazenamento de conteúdo real.
