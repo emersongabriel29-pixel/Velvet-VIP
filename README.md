@@ -36,6 +36,13 @@ Em um projeto Supabase novo, execute nesta ordem:
 1. `supabase/schema.sql`
 2. `supabase/001_hardening.sql`
 3. `supabase/002_production.sql`
+4. `supabase/003_catalog_moderation.sql`
+5. `supabase/004_monetization.sql`
+6. `supabase/005_entertainment.sql`
+7. `supabase/006_content_access.sql`
+8. `supabase/007_progression_referrals.sql`
+9. `supabase/008_creator_plans.sql`
+10. `supabase/009_safety_moderation.sql`
 
 A segunda migração endurece RLS e impede alterações client-side em campos financeiros/administrativos. A terceira cria o provisionamento de perfil após signup, ledger financeiro, idempotência de webhooks, auditoria e bucket privado de mídia.
 
