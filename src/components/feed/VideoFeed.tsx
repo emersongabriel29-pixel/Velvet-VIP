@@ -7,6 +7,7 @@ import { CommentsModal } from './CommentsModal';
 import { ShareModal } from './ShareModal';
 import { ReportModal } from './ReportModal';
 import { SubscribeModal } from '../creator/SubscribeModal';
+import { AdBanner } from '../ads/AdBanner';
 
 interface VideoFeedProps {
   currentTab: FeedTab;
@@ -71,7 +72,10 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleScroll);
+    const showAds = true;
+
+  return (
+    <>{showAds && <AdBanner compact />}) => container.removeEventListener('scroll', handleScroll);
   }, [activeIndex, videos.length]);
 
   // Keyboard navigation: Arrow Up / Down to switch videos
@@ -223,6 +227,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
           }}
         />
       )}
-    </div>
+    </div></>
+
   );
 };
