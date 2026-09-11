@@ -231,3 +231,6 @@ export interface Notification {
 }
 
 export type FeedTab = 'foryou' | 'following' | 'trending' | 'new' | 'premium';
+
+export interface CreatorTip { id: string; sender_id: string; creator_id: string; amount: number; platform_fee: number; creator_amount: number; message?: string; status: 'pending' | 'paid' | 'refunded' | 'cancelled'; created_at: string; }
+export interface PlatformPlan { id: string; name: string; slug: string; monthly_price: number; ads_enabled: boolean; benefits: string[]; is_active: boolean; created_at: string; }
