@@ -1,42 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, Users, Heart, MessageCircle, DollarSign, Radio, Loader2 } from 'lucide-react';
+import { BarChart3, Users, Heart, MessageCircle, DollarSign, Radio, Loader2, Eye, Target } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
-export const CreatorAnalyticsPanel: React.FC<{ creatorId: string; fallback: { followers: number; views: number; likes: number; comments: number; earnings: number } }> = ({ creatorId, fallback }) => {
-  const [data, setData] = useState({ subscribers: 0, views: fallback.views, likes: fallback.likes, comments: fallback.comments, tips: 0, sales: 0, lives: 0 });
-  const [loading, setLoading] = useState(true);
-  const [notice, setNotice] = useState('');
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!isSupabaseConfigured || !supabase || creatorId.startsWith('cr-')) { setLoading(false); return; }
-      try {
-        const [subs, tips, sales, videos, lives] = await Promise.all([
-          supabase.from('creator_subscriptions').select('user_id', { count: 'exact', head: true }).eq('creator_id', creatorId).eq('status', 'active'),
-          supabase.from('creator_tips').select('creator_amount').eq('creator_id', creatorId).eq('status', 'paid'),
-          supabase.from('purchases').select('amount').eq('creator_id', creatorId).eq('status', 'completed'),
-          supabase.from('videos').select('views_count,likes_count,comments_count').eq('creator_id', creatorId).eq('moderation_status', 'approved'),
-          supabase.from('live_sessions').select('id', { count: 'exact', head: true }).eq('creator_id', creatorId),
-        ]);
-        const error = [subs, tips, sales, videos, lives].find(result => result.error)?.error;
-        if (error) throw error;
-        const totals = (videos.data || []).reduce((acc, video: any) => ({ views: acc.views + Number(video.views_count || 0), likes: acc.likes + Number(video.likes_count || 0), comments: acc.comments + Number(video.comments_count || 0) }), { views: 0, likes: 0, comments: 0 });
-        if (mounted) setData({ subscribers: subs.count || 0, views: totals.views, likes: totals.likes, comments: totals.comments, tips: (tips.data || []).reduce((sum, row: any) => sum + Number(row.creator_amount || 0), 0), sales: (sales.data || []).reduce((sum, row: any) => sum + Number(row.amount || 0), 0), lives: lives.count || 0 });
-      } catch (error: any) { if (mounted) setNotice('Relatório parcial: algumas métricas exigem políticas de leitura do Supabase.'); }
-      finally { if (mounted) setLoading(false); }
-    })();
-    return () => { mounted = false; };
-  }, [creatorId]);
-
-  const engagement = data.views ? ((data.likes + data.comments) / data.views * 100).toFixed(2).replace('.', ',') : '0,00';
-  const card = [
-    ['Assinantes ativos', data.subscribers, Users, 'text-rose-300'],
-    ['Engajamento', `${engagement}%`, Heart, 'text-pink-300'],
-    ['Gorjetas pagas', `R$ ${data.tips.toFixed(2).replace('.', ',')}`, DollarSign, 'text-amber-300'],
-    ['Vendas confirmadas', `R$ ${data.sales.toFixed(2).replace('.', ',')}`, BarChart3, 'text-emerald-300'],
-    ['Comentários', data.comments, MessageCircle, 'text-sky-300'],
-    ['Lives realizadas', data.lives, Radio, 'text-violet-300'],
-  ];
-  return <section className="mt-6 rounded-3xl border border-zinc-800 bg-zinc-900/60 p-5"><div className="flex items-center justify-between"><div><h2 className="flex items-center gap-2 text-lg font-bold"><BarChart3 className="h-5 w-5 text-rose-400" /> Relatório de desempenho</h2><p className="mt-1 text-xs text-zinc-500">Assinaturas e pagamentos entram somente quando confirmados.</p></div>{loading && <Loader2 className="h-4 w-4 animate-spin text-rose-400" />}</div>{notice && <p className="mt-3 text-xs text-amber-300">{notice}</p>}<div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3">{card.map(([label, value, Icon, tone]: any) => <div key={label} className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4"><Icon className={`h-5 w-5 ${tone}`} /><p className="mt-3 text-xs text-zinc-500">{label}</p><p className={`mt-1 text-xl font-black ${tone}`}>{value}</p></div>)}</div></section>;
+type Props={creatorId:string;fallback:{followers:number;views:number;likes:number;comments:number;earnings:number}};
+type Row={id:string;type:string;amount:number;status:string;created_at:string;source?:string};
+export const CreatorAnalyticsPanel:React.FC<Props>=({creatorId,fallback})=>{
+ const [period,setPeriod]=useState<'7'|'30'|'90'>('30'); const [loading,setLoading]=useState(true); const [notice,setNotice]=useState('');
+ const [data,setData]=useState({subscribers:0,views:0,likes:0,comments:0,tips:0,ppv:0,subscriptionsRevenue:0,lives:0,visitors:0,conversion:0,retention:0,byVideo:[] as any[],sources:[] as any[],history:[] as Row[]});
+ useEffect(()=>{let mounted=true;(async()=>{if(!supabase||!isSupabaseConfigured||creatorId.startsWith('cr-')){setData(v=>({...v,views:fallback.views,likes:fallback.likes,comments:fallback.comments,subscriptionsRevenue:fallback.earnings}));setLoading(false);return;}setLoading(true);const since=new Date(Date.now()-Number(period)*86400000).toISOString();try{
+ const [subs,tips,ppv,videos,events,lives]=await Promise.all([
+  supabase.from('creator_subscriptions').select('id,amount,created_at,status').eq('creator_id',creatorId).gte('created_at',since),
+  supabase.from('creator_tips').select('id,creator_amount,amount,created_at,status').eq('creator_id',creatorId).eq('status','paid').gte('created_at',since),
+  supabase.from('purchases').select('id,amount,created_at,status,video_id').eq('creator_id',creatorId).eq('status','completed').gte('created_at',since),
+  supabase.from('videos').select('id,title,views_count,likes_count,comments_count').eq('creator_id',creatorId).eq('is_removed',false),
+  supabase.from('creator_analytics_events').select('event_type,source,created_at,amount').eq('creator_id',creatorId).gte('created_at',since),
+  supabase.from('live_sessions').select('id').eq('creator_id',creatorId).gte('created_at',since)
+ ]);
+ const error=[subs,tips,ppv,videos,events,lives].find(x=>x.error)?.error;if(error)throw error;
+ const s=subs.data||[],t=tips.data||[],p=ppv.data||[],v=videos.data||[],e=events.data||[];
+ const views=v.reduce((n:any,x:any)=>n+Number(x.views_count||0),0), likes=v.reduce((n:any,x:any)=>n+Number(x.likes_count||0),0), comments=v.reduce((n:any,x:any)=>n+Number(x.comments_count||0),0);
+ const visitors=e.filter((x:any)=>x.event_type==='profile_view').length; const conversions=s.filter((x:any)=>x.status==='active'||x.status==='paid').length;
+ const sourceMap=e.filter((x:any)=>x.event_type==='subscription').reduce((m:any,x:any)=>{m[x.source||'direct']=(m[x.source||'direct']||0)+1;return m;},{});
+ const history:Row[]=[...s.map((x:any)=>({id:x.id,type:'Assinatura',amount:Number(x.amount||0),status:x.status,created_at:x.created_at})),...t.map((x:any)=>({id:x.id,type:'Gorjeta',amount:Number(x.creator_amount||x.amount||0),status:x.status,created_at:x.created_at})),...p.map((x:any)=>({id:x.id,type:'PPV',amount:Number(x.amount||0),status:x.status,created_at:x.created_at}))].sort((a,b)=>b.created_at.localeCompare(a.created_at));
+ if(mounted)setData({subscribers:conversions,views,likes,comments,tips:t.reduce((n:any,x:any)=>n+Number(x.creator_amount||x.amount||0),0),ppv:p.reduce((n:any,x:any)=>n+Number(x.amount||0),0),subscriptionsRevenue:s.reduce((n:any,x:any)=>n+Number(x.amount||0),0),lives:(lives.data||[]).length,visitors,conversion:visitors?conversions/visitors*100:0,retention:0,byVideo:v,sources:Object.entries(sourceMap).map(([source,count])=>({source,count})),history});
+ }catch(error:any){if(mounted)setNotice('Não foi possível ler todas as métricas. Verifique as políticas RLS e execute a migração 012.');}finally{if(mounted)setLoading(false);}})();return()=>{mounted=false;};},[creatorId,period]);
+ const engagement=data.views?((data.likes+data.comments)/data.views*100):0; const totalRevenue=data.tips+data.ppv+data.subscriptionsRevenue;
+ const cards=[['Assinantes ativos',data.subscribers,Users,'text-rose-300'],['Visualizações',data.views,Eye,'text-amber-300'],['Engajamento',engagement.toFixed(2).replace('.',',')+'%',Heart,'text-pink-300'],['Conversão',data.conversion.toFixed(2).replace('.',',')+'%',Target,'text-sky-300'],['Receita total','R$ '+totalRevenue.toFixed(2).replace('.',','),DollarSign,'text-emerald-300'],['Lives',data.lives,Radio,'text-violet-300']];
+ return <section className="mt-6 rounded-3xl border border-zinc-800 bg-zinc-900/60 p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="flex items-center gap-2 text-lg font-bold"><BarChart3 className="h-5 w-5 text-rose-400"/> Analytics do criador</h2><p className="mt-1 text-xs text-zinc-500">Dados confirmados do Supabase no período selecionado.</p></div><div className="flex items-center gap-2">{(['7','30','90'] as const).map(x=><button key={x} onClick={()=>setPeriod(x)} className={`rounded-lg px-3 py-2 text-xs font-bold ${period===x?'bg-rose-600':'bg-zinc-800 text-zinc-400'}`}>{x} dias</button>)}{loading&&<Loader2 className="h-4 w-4 animate-spin text-rose-400"/>}</div></div>{notice&&<p className="mt-3 text-xs text-amber-300">{notice}</p>}<div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3">{cards.map(([label,value,Icon,tone]:any)=><div key={label} className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4"><Icon className={`h-5 w-5 ${tone}`}/><p className="mt-3 text-xs text-zinc-500">{label}</p><p className={`mt-1 text-xl font-black ${tone}`}>{value}</p></div>)}</div><div className="mt-5 grid gap-4 lg:grid-cols-3"><div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4"><h3 className="flex items-center gap-2 text-sm font-bold"><DollarSign className="h-4 w-4 text-emerald-300"/>Receita por origem</h3><p className="mt-2 text-xs text-zinc-400">Assinaturas: R$ {data.subscriptionsRevenue.toFixed(2).replace('.',',')}</p><p className="mt-1 text-xs text-zinc-400">Gorjetas: R$ {data.tips.toFixed(2).replace('.',',')}</p><p className="mt-1 text-xs text-zinc-400">PPV: R$ {data.ppv.toFixed(2).replace('.',',')}</p></div><div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4"><h3 className="flex items-center gap-2 text-sm font-bold"><Users className="h-4 w-4 text-rose-300"/>Origem dos assinantes</h3>{data.sources.length?data.sources.map((x:any)=><p key={x.source} className="mt-2 text-xs text-zinc-400">{x.source}: {x.count}</p>):<p className="mt-2 text-xs text-zinc-500">Eventos de origem ainda não registrados.</p>}</div><div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4"><h3 className="flex items-center gap-2 text-sm font-bold"><Eye className="h-4 w-4 text-amber-300"/>Visualizações por vídeo</h3><div className="mt-2 space-y-2">{data.byVideo.slice(0,5).map((x:any)=><div key={x.id}><div className="flex justify-between text-xs"><span className="truncate">{x.title}</span><span>{x.views_count||0}</span></div><div className="mt-1 h-1.5 rounded bg-zinc-800"><div className="h-1.5 rounded bg-amber-400" style={{width:`${Math.min(100,Number(x.views_count||0)/(Math.max(1,...data.byVideo.map((z:any)=>Number(z.views_count||0))))*100)}%`}}/></div></div>)}{!data.byVideo.length&&<p className="text-xs text-zinc-500">Nenhum vídeo publicado.</p>}</div></div></div><div className="mt-5 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4"><h3 className="flex items-center gap-2 text-sm font-bold"><MessageCircle className="h-4 w-4 text-sky-300"/>Histórico de pagamentos</h3>{data.history.length?data.history.slice(0,10).map(x=><div key={x.id} className="mt-2 flex justify-between border-b border-zinc-800 pb-2 text-xs"><span>{x.type} • {new Date(x.created_at).toLocaleDateString('pt-BR')}</span><span className="font-bold text-emerald-300">R$ {x.amount.toFixed(2).replace('.',',')}</span></div>):<p className="mt-2 text-xs text-zinc-500">Nenhum pagamento no período.</p>}</div></section>;
 };
