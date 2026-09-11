@@ -15,7 +15,7 @@ import { LandingPage } from './components/landing/LandingPage';
 import { UploadModal } from './components/creator/UploadModal';
 import { WalletModal } from './components/wallet/WalletModal';
 import { SupabaseConfigModal } from './components/supabase/SupabaseConfigModal';
-import { AuthModal } from './components/auth/AuthModal';
+import { AuthModalV2 as AuthModal } from './components/auth/AuthModalV2';
 import { LgpdTermsModal } from './components/legal/LgpdTermsModal';
 
 const VelvetVipApp: React.FC = () => {
@@ -23,175 +23,36 @@ const VelvetVipApp: React.FC = () => {
   const [activeView, setActiveView] = useState<string>('feed');
   const [currentTab, setCurrentTab] = useState<FeedTab>('foryou');
   const [selectedCreatorId, setSelectedCreatorId] = useState<string | undefined>(undefined);
-
-  // Global modals
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [lgpdModalOpen, setLgpdModalOpen] = useState(false);
 
-  const handleSelectCreator = (creatorId: string) => {
-    setSelectedCreatorId(creatorId);
-    setActiveView('profile');
-  };
+  const handleSelectCreator = (creatorId: string) => { setSelectedCreatorId(creatorId); setActiveView('profile'); };
+  const handleSelectVideo = (_videoId: string) => { setActiveView('feed'); };
+  const handleOpenProfile = () => { setSelectedCreatorId(undefined); setActiveView('profile'); };
 
-  const handleSelectVideo = (videoId: string) => {
-    setActiveView('feed');
-    // We can also switch to feed to view it
-  };
-
-  const handleOpenProfile = () => {
-    setSelectedCreatorId(undefined); // views logged in profile
-    setActiveView('profile');
-  };
-
-  return (
-    <div id="velvet-vip-root" className="min-h-screen bg-[#09090b] text-zinc-100 selection:bg-rose-500 selection:text-white font-sans overflow-x-hidden">
-      {/* 18+ Age Gate Legal Verification Modal */}
-      <AgeVerificationModal />
-
-      {/* Top Header */}
-      <Header
-        currentTab={currentTab}
-        onTabChange={(tab) => {
-          setCurrentTab(tab);
-          setActiveView('feed');
-        }}
-        activeView={activeView}
-        onViewChange={(view) => {
-          if (view === 'profile') {
-            handleOpenProfile();
-          } else {
-            setActiveView(view);
-          }
-        }}
-        onOpenSupabaseModal={() => setSupabaseModalOpen(true)}
-        onOpenWalletModal={() => setWalletModalOpen(true)}
-        onOpenLanding={() => setActiveView('landing')}
-        onOpenAuthModal={() => setAuthModalOpen(true)}
-        onOpenLgpdModal={() => setLgpdModalOpen(true)}
-      />
-
-      {/* Main View Area */}
-      <main className="w-full">
-        {activeView === 'feed' && (
-          <VideoFeed
-            currentTab={currentTab}
-            onSelectCreator={handleSelectCreator}
-            onOpenUpload={() => setUploadModalOpen(true)}
-          />
-        )}
-
-        {activeView === 'explore' && (
-          <ExplorePage
-            onSelectVideo={handleSelectVideo}
-            onSelectCreator={handleSelectCreator}
-          />
-        )}
-
-        {activeView === 'activity' && (
-          <NotificationsPage
-            onSelectVideo={handleSelectVideo}
-            onSelectCreator={handleSelectCreator}
-          />
-        )}
-
-        {activeView === 'profile' && (
-          <ProfileView
-            creatorId={selectedCreatorId}
-            onSelectVideo={handleSelectVideo}
-            onOpenCreatorStudio={() => setActiveView('creator_studio')}
-            onOpenMyPurchases={() => setActiveView('purchases')}
-            onOpenWallet={() => setWalletModalOpen(true)}
-            onOpenUpload={() => setUploadModalOpen(true)}
-            onOpenLgpd={() => setLgpdModalOpen(true)}
-            onOpenAuth={() => setAuthModalOpen(true)}
-          />
-        )}
-
-        {activeView === 'creator_studio' && (
-          <CreatorDashboard
-            onOpenUpload={() => setUploadModalOpen(true)}
-            onSelectVideo={handleSelectVideo}
-          />
-        )}
-
-        {activeView === 'purchases' && (
-          <MyPurchasesPage
-            onSelectVideo={handleSelectVideo}
-            onBack={() => setActiveView('profile')}
-          />
-        )}
-
-        {activeView === 'admin' && (
-          <AdminPanel onSelectVideo={handleSelectVideo} />
-        )}
-
-        {activeView === 'landing' && (
-          <LandingPage
-            onEnterApp={() => setActiveView('feed')}
-            onOpenUpload={() => setUploadModalOpen(true)}
-          />
-        )}
-      </main>
-
-      {/* Mobile Fixed Bottom Navigation (hidden on landing presentation view) */}
-      {activeView !== 'landing' && (
-        <BottomNav
-          activeView={activeView}
-          onViewChange={(view) => {
-            if (view === 'profile') {
-              handleOpenProfile();
-            } else {
-              setActiveView(view);
-            }
-          }}
-          onOpenUploadModal={() => setUploadModalOpen(true)}
-        />
-      )}
-
-      {/* Global Interactive Modals */}
-      <UploadModal
-        isOpen={uploadModalOpen}
-        onClose={() => setUploadModalOpen(false)}
-        onSuccess={() => {
-          setActiveView('feed');
-          setCurrentTab('foryou');
-        }}
-      />
-
-      <WalletModal
-        isOpen={walletModalOpen}
-        onClose={() => setWalletModalOpen(false)}
-      />
-
-      <SupabaseConfigModal
-        isOpen={supabaseModalOpen}
-        onClose={() => setSupabaseModalOpen(false)}
-      />
-
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onOpenTerms={() => {
-          setAuthModalOpen(false);
-          setLgpdModalOpen(true);
-        }}
-      />
-
-      <LgpdTermsModal
-        isOpen={lgpdModalOpen}
-        onClose={() => setLgpdModalOpen(false)}
-      />
-    </div>
-  );
+  return <div id="velvet-vip-root" className="min-h-screen overflow-x-hidden bg-[#09090b] font-sans text-zinc-100 selection:bg-rose-500 selection:text-white">
+    <AgeVerificationModal />
+    <Header currentTab={currentTab} onTabChange={(tab) => { setCurrentTab(tab); setActiveView('feed'); }} activeView={activeView} onViewChange={(view) => view === 'profile' ? handleOpenProfile() : setActiveView(view)} onOpenSupabaseModal={() => setSupabaseModalOpen(true)} onOpenWalletModal={() => setWalletModalOpen(true)} onOpenLanding={() => setActiveView('landing')} onOpenAuthModal={() => setAuthModalOpen(true)} onOpenLgpdModal={() => setLgpdModalOpen(true)} />
+    <main className="w-full">
+      {activeView === 'feed' && <VideoFeed currentTab={currentTab} onSelectCreator={handleSelectCreator} onOpenUpload={() => setUploadModalOpen(true)} />}
+      {activeView === 'explore' && <ExplorePage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} />}
+      {activeView === 'activity' && <NotificationsPage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} />}
+      {activeView === 'profile' && <ProfileView creatorId={selectedCreatorId} onSelectVideo={handleSelectVideo} onOpenCreatorStudio={() => setActiveView('creator_studio')} onOpenMyPurchases={() => setActiveView('purchases')} onOpenWallet={() => setWalletModalOpen(true)} onOpenUpload={() => setUploadModalOpen(true)} onOpenLgpd={() => setLgpdModalOpen(true)} onOpenAuth={() => setAuthModalOpen(true)} />}
+      {activeView === 'creator_studio' && <CreatorDashboard onOpenUpload={() => setUploadModalOpen(true)} onSelectVideo={handleSelectVideo} />}
+      {activeView === 'purchases' && <MyPurchasesPage onSelectVideo={handleSelectVideo} onBack={() => setActiveView('profile')} />}
+      {activeView === 'admin' && <AdminPanel onSelectVideo={handleSelectVideo} />}
+      {activeView === 'landing' && <LandingPage onEnterApp={() => setActiveView('feed')} onOpenUpload={() => setUploadModalOpen(true)} />}
+    </main>
+    {activeView !== 'landing' && <BottomNav activeView={activeView} onViewChange={(view) => view === 'profile' ? handleOpenProfile() : setActiveView(view)} onOpenUploadModal={() => setUploadModalOpen(true)} />}
+    <UploadModal isOpen={uploadModalOpen} onClose={() => setUploadModalOpen(false)} onSuccess={() => { setActiveView('feed'); setCurrentTab('foryou'); }} />
+    <WalletModal isOpen={walletModalOpen} onClose={() => setWalletModalOpen(false)} />
+    <SupabaseConfigModal isOpen={supabaseModalOpen} onClose={() => setSupabaseModalOpen(false)} />
+    <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} onOpenTerms={() => { setAuthModalOpen(false); setLgpdModalOpen(true); }} />
+    <LgpdTermsModal isOpen={lgpdModalOpen} onClose={() => setLgpdModalOpen(false)} />
+  </div>;
 };
 
-export default function App() {
-  return (
-    <AuthProvider>
-      <VelvetVipApp />
-    </AuthProvider>
-  );
-}
+export default function App() { return <AuthProvider><VelvetVipApp /></AuthProvider>; }
