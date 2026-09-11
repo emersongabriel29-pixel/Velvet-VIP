@@ -11,6 +11,7 @@ import { ProfileView } from './components/profile/ProfileView';
 import { CreatorDashboard } from './components/creator/CreatorDashboard';
 import { MyPurchasesPage } from './components/purchases/MyPurchasesPage';
 import { AdminPanel } from './components/admin/AdminPanel';
+import { AdminCommandCenter } from './components/admin/AdminCommandCenter';
 import { LandingPage } from './components/landing/LandingPage';
 import { UploadModal } from './components/creator/UploadModal';
 import { WalletModal } from './components/wallet/WalletModal';
@@ -49,7 +50,7 @@ const VelvetVipApp: React.FC = () => {
       {activeView === 'profile' && <ProfileView creatorId={selectedCreatorId} onSelectVideo={handleSelectVideo} onOpenCreatorStudio={() => setActiveView('creator_studio')} onOpenMyPurchases={() => setActiveView('purchases')} onOpenWallet={() => setWalletModalOpen(true)} onOpenUpload={() => setUploadModalOpen(true)} onOpenLgpd={() => setLgpdModalOpen(true)} onOpenAuth={() => setAuthModalOpen(true)} />}
       {activeView === 'creator_studio' && <CreatorDashboard onOpenUpload={() => setUploadModalOpen(true)} onSelectVideo={handleSelectVideo} />}
       {activeView === 'purchases' && <MyPurchasesPage onSelectVideo={handleSelectVideo} onBack={() => setActiveView('profile')} />}
-      {activeView === 'admin' && <AdminPanel onSelectVideo={handleSelectVideo} />}
+      {activeView === 'admin' && <AdminCommandCenter onSelectVideo={handleSelectVideo} />}
       {activeView === 'live' && <LivePage onBack={() => setActiveView('feed')} />}
       {activeView === 'community' && <CommunityPage onBack={() => setActiveView('feed')} />}
       {activeView === 'monetization' && <MonetizationPage onBack={() => setActiveView('feed')} />}
