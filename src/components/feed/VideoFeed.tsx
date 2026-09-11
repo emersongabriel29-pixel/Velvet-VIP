@@ -162,10 +162,12 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
           videos.map((video, idx) => {
             // Only mount full rendering for active video, preload adjacent 1 video
             const isNear = Math.abs(idx - activeIndex) <= 1;
-            const showAds = true;
+            const showAds = (currentUser.platform_plan_slug ?? 'gratis') === 'gratis' && idx > 0 && idx % 4 === 0;
 
   return (
-    <>{showAds && <AdBanner compact />}              <div key={video.id} className="w-full h-full flex items-center justify-center snap-start">
+    <div key={video.id} className="w-full min-h-full snap-start">
+      {showAds && <AdBanner compact />}
+      <div className="w-full h-full flex items-center justify-center"> className="w-full h-full flex items-center justify-center snap-start">
                 {isNear ? (
                   <VideoCard
                     video={video}
@@ -183,6 +185,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
                   <div className="w-full h-[88vh] sm:max-w-[420px] bg-zinc-950 rounded-3xl border border-zinc-900" />
                 )}
               </div>
+    </div>
             );
           })
         )}
@@ -227,7 +230,5 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
         />
       )}
     </div>
-
-    </>
   );
 };
