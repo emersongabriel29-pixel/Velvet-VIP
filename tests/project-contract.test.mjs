@@ -23,6 +23,12 @@ test('payment client never fabricates a successful checkout', async () => {
   assert.match(payments, /checkoutUrl/);
 });
 
+test('explicit free content is blocked server-side', async () => {
+  const sql = await read('supabase/011_moderation_enforcement.sql');
+  assert.match(sql, /Conteúdo explícito não pode ser gratuito/);
+  assert.match(sql, /moderation_status.*pending/);
+});
+
 test('migration order includes payment idempotency layer', async () => {
   const readme = await read('README.md');
   assert.match(readme, /010/);
