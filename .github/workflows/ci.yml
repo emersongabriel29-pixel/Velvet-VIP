@@ -25,5 +25,8 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Automated contract tests
+        run: npm test
+
       - name: Production build
         run: npm run build
