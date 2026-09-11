@@ -949,7 +949,7 @@ class DatabaseService {
     let creator = this.getCreatorByUserId(cur.id);
 
     if (!creator) {
-      creator = this.creators[0]; // fallback
+      throw new Error('Apenas criadores aprovados podem publicar conteúdo.');
     }
 
     const newVideo: Video = {
@@ -996,8 +996,7 @@ class DatabaseService {
     const price = planTier === 'vip' ? creator.subscription_price_vip : creator.subscription_price_basic;
 
     if (cur.wallet_balance < price) {
-      // Top up simulated wallet balance automatically if needed
-      this.updateUser(cur.id, { wallet_balance: cur.wallet_balance + price + 50 });
+      throw new Error('Saldo insuficiente. Adicione créditos antes de assinar.');
     }
 
     // Deduct user wallet
@@ -1396,7 +1395,7 @@ class DatabaseService {
       id: 'sec-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
       event,
       user_email,
-      ip_address: '177.136.' + Math.floor(Math.random() * 255) + '.' + Math.floor(Math.random() * 255),
+      ip_address: 'redacted',
       status,
       details,
       timestamp: new Date().toISOString()
