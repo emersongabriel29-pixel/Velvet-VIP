@@ -8,6 +8,7 @@ import { ShareModal } from './ShareModal';
 import { ReportModal } from './ReportModal';
 import { SubscribeModal } from '../creator/SubscribeModal';
 import { AdBanner } from '../ads/AdBanner';
+import { useAuth } from '../../hooks/useAuth';
 
 interface VideoFeedProps {
   currentTab: FeedTab;
