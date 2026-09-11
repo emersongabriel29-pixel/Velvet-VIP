@@ -72,10 +72,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
-    const showAds = true;
-
-  return (
-    <>{showAds && <AdBanner compact />}) => container.removeEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
   }, [activeIndex, videos.length]);
 
   // Keyboard navigation: Arrow Up / Down to switch videos
@@ -165,8 +162,10 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
           videos.map((video, idx) => {
             // Only mount full rendering for active video, preload adjacent 1 video
             const isNear = Math.abs(idx - activeIndex) <= 1;
-            return (
-              <div key={video.id} className="w-full h-full flex items-center justify-center snap-start">
+            const showAds = true;
+
+  return (
+    <>{showAds && <AdBanner compact />}              <div key={video.id} className="w-full h-full flex items-center justify-center snap-start">
                 {isNear ? (
                   <VideoCard
                     video={video}
@@ -227,7 +226,8 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
           }}
         />
       )}
-    </div></>
+    </div>
 
+    </>
   );
 };
