@@ -41,12 +41,14 @@ Em um projeto Supabase novo, execute nesta ordem:
 6. `supabase/005_entertainment.sql`
 7. `supabase/006_content_access.sql`
 8. `supabase/007_progression_referrals.sql`
-9. `supabase/008_creator_plans.sql`
-10. `supabase/009_safety_moderation.sql
-- `010_payment_events.sql
-- `011_moderation_enforcement.sql` — enforcement server-side e revisão de uploads
+9. `supabase/009_safety_moderation.sql`
+10. `supabase/010_payment_events.sql` — sessões de checkout e idempotência de webhooks
+11. `supabase/011_moderation_enforcement.sql` — enforcement server-side e revisão de uploads
+12. `supabase/migrations/012_admin_creator_analytics.sql` — administração, taxas, planos e analytics
+13. `supabase/migrations/013_production_hardening.sql` — KYC, mídia, antifraude e observabilidade
 
-- Planejamento futuro de armazenamento e streaming: [`VIDEO_STORAGE_ROADMAP.md`](./VIDEO_STORAGE_ROADMAP.md)` — sessões de checkout e idempotência de webhooks`
+Planejamento de armazenamento e streaming: [`VIDEO_STORAGE_ROADMAP.md`](./VIDEO_STORAGE_ROADMAP.md)
+Status operacional: [`PRODUCTION_STATUS.md`](./PRODUCTION_STATUS.md)
 
 A segunda migração endurece RLS e impede alterações client-side em campos financeiros/administrativos. A terceira cria o provisionamento de perfil após signup, ledger financeiro, idempotência de webhooks, auditoria e bucket privado de mídia.
 
@@ -100,7 +102,7 @@ O workflow `.github/workflows/ci.yml` executa `npm install`, `npm run typecheck`
 
 ## Checklist antes de abrir para o público
 
-- [ ] Configurar Supabase real e executar as três migrations.
+- [ ] Configurar Supabase real e executar as migrações 001–013.
 - [ ] Configurar Auth, domínio e e-mails de confirmação/reset.
 - [ ] Configurar secrets das Edge Functions.
 - [ ] Criar aplicação Mercado Pago e configurar webhook assinado.
