@@ -987,6 +987,7 @@ class DatabaseService {
     premium_price?: number;
     required_tier?: 'free' | 'basic' | 'vip';
     is_draft?: boolean;
+    content_kind?: 'short' | 'long';
   }): Video {
     const cur = this.getCurrentUser();
     let creator = this.getCreatorByUserId(cur.id);
@@ -1003,7 +1004,9 @@ class DatabaseService {
       video_url: data.video_url,
       thumbnail_url: data.thumbnail_url || 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&fit=crop',
       duration_seconds: 15,
-      aspect_ratio: '9:16',
+      aspect_ratio: data.content_kind === 'long' ? '16:9' : '9:16',
+      content_kind: data.content_kind || 'short',
+      orientation: data.content_kind === 'long' ? 'horizontal' : 'vertical',
       is_premium: data.is_premium,
       premium_price: data.is_premium ? (data.premium_price || 19.90) : 0,
       required_tier: data.is_premium ? (data.required_tier || 'basic') : 'free',
