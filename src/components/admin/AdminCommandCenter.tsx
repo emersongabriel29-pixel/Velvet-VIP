@@ -3,6 +3,7 @@ import { BarChart3, Settings, ShieldAlert, Users, Tag, Megaphone, DollarSign, Sa
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { AdminEditor } from './AdminEditor';
+import { dbService } from '../../services/db';
 import { PunishmentsPanel } from './PunishmentsPanel';
 
 type Plan = { id:string; name:string; slug:string; monthly_price:number; semiannual_price:number; annual_price:number; ads_enabled:boolean; benefits:any; is_active:boolean };
@@ -28,7 +29,7 @@ export const AdminCommandCenter: React.FC<{ onSelectVideo?: (id:string)=>void }>
   const [newCampaign,setNewCampaign] = useState({name:'',advertiser_name:'',placement:'feed',budget:'',target_url:'',start_at:'',end_at:'',audience:'all',creative_url:'',status:'draft'});
 
   const load = async () => {
-    if (!supabase || !isSupabaseConfigured) { setLoading(false); setMessage('Configure o Supabase para ativar o centro administrativo real.'); return; }
+    if (!supabase || !isSupabaseConfigured) { setCategories(dbService.getCategories(true)); setTags(dbService.getTags()); setLoading(false); setMessage('Prévia local: categorias e tags abaixo são os dados existentes de demonstração. Configure o Supabase para editar o catálogo real.'); return; }
     setLoading(true);
     try {
       const [users,creators,videos,paid,subs,reportRows,planRows,settingsRow,categoryRows,tagRows,creatorList,campaignRows,videoRows,commentRows,liveRows] = await Promise.all([
