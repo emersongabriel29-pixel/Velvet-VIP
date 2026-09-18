@@ -128,6 +128,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
         premium_price: accessType === 'premium' ? premiumPrice : 0,
         required_tier: accessType === 'premium' ? requiredTier : 'free',
         is_draft: asDraft,
+        content_kind: mode,
       });
 
       setIsUploading(false);
@@ -165,7 +166,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
               {isDraft ? 'Salvo como Rascunho!' : 'Vídeo Publicado com Sucesso!'}
             </h4>
             <p className="text-xs text-zinc-400">
-              Seu conteúdo já está processado e disponível no feed dos seus seguidores e assinantes.
+              {mode === 'long' ? 'Seu vídeo longo foi publicado e ficará disponível no perfil do criador.' : 'Seu conteúdo já está processado e disponível no feed dos seus seguidores e assinantes.'}
             </p>
           </div>
         ) : isUploading ? (
@@ -173,7 +174,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
             <div className="w-14 h-14 rounded-full bg-rose-950/60 border border-rose-500/40 flex items-center justify-center mx-auto animate-pulse">
               <Upload className="w-7 h-7 text-rose-500" />
             </div>
-            <h4 className="text-base font-bold text-white">Processando e codificando vídeo vertical...</h4>
+            <h4 className="text-base font-bold text-white">{mode === 'long' ? 'Processando e codificando vídeo longo...' : 'Processando e codificando vídeo vertical...'}</h4>
             <div className="max-w-md mx-auto w-full bg-zinc-800 rounded-full h-3 overflow-hidden">
               <div
                 className="bg-gradient-to-r from-rose-600 to-amber-500 h-full transition-all duration-300"
