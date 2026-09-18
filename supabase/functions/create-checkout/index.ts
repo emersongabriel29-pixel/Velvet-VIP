@@ -21,6 +21,11 @@ Deno.serve(async (req) => {
   if (authError || !user) return json(req,{ error: 'Sessão inválida.' }, 401);
 
   const admin = createClient(supabaseUrl, serviceKey);
+  const limited = await admin.rpc('consume_rate_limit', { p_bucket: 'legacy_checkout', p_subject: user.id, p_limit: 10, p_window_seconds: 60 });
+  if (limited.error || limited.data !== true) return json(req,{ error: 'Muitas tentativas. Tente novamente em instantes.' }, 429);
+  const now = new Date().toISOString();
+  const restriction = await admin.from('account_restrictions').select('id').eq('subject_user_id', user.id).eq('is_active', true).in('scope', ['account','purchase']).lte('starts_at', now).or(`ends_at.is.null,ends_at.gt.${now}`).limit(1);
+  if (restriction.data?.length) return json(req,{ error: 'Conta temporariamente impedida de realizar compras.' }, 403);
   const body = await req.json();
   const kind = body.kind;
   let amount = 0;
