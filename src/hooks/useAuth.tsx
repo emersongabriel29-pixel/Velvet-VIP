@@ -11,6 +11,8 @@ interface AuthContextType {
   hasConsented18Plus: boolean;
   confirmAgeVerification: (birthDate?: string) => Promise<void>;
   login: (email: string, pass: string) => Promise<boolean>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   register: (name: string, username: string, email: string, birthDate: string, role?: 'user' | 'creator', password?: string) => Promise<User | null>;
   logout: () => Promise<void>;
   switchUserRole: (role: UserRole) => void;
@@ -126,6 +128,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return Boolean(await loadSupabaseProfile(data.user.id, data.user.email || email));
   };
 
+  const requestPasswordReset = async (email: string) => {
+    if (demoMode) throw new Error('Recuperação de senha exige Supabase configurado.');
+    if (!supabase) throw new Error('Supabase não configurado.');
+    const redirectTo = `${window.location.origin}${window.location.pathname}`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+    if (error) throw error;
+  };
+
+  const updatePassword = async (password: string) => {
+    if (demoMode || !supabase) throw new Error('Supabase não configurado.');
+    if (password.length < 8) throw new Error('Use uma senha com pelo menos 8 caracteres.');
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+  };
+
   const register = async (name: string, username: string, email: string, birthDate: string, role: 'user' | 'creator' = 'user', password = ''): Promise<User | null> => {
     if (demoMode) {
       const user = dbService.registerUser(name, username, email, birthDate, role);
@@ -182,7 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value = useMemo(() => ({
     currentUser, currentCreator, isAuthenticated, isAgeVerified: currentUser.age_verified && hasConsented18Plus,
-    hasConsented18Plus, confirmAgeVerification, login, register, logout, switchUserRole, switchUser,
+    hasConsented18Plus, confirmAgeVerification, login, requestPasswordReset, updatePassword, register, logout, switchUserRole, switchUser,
     updateProfile, topUpWallet, allUsers
   }), [currentUser, currentCreator, isAuthenticated, hasConsented18Plus, allUsers]);
 
