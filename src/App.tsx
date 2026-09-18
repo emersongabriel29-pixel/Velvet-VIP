@@ -49,7 +49,7 @@ const VelvetVipApp: React.FC = () => {
       {activeView === 'explore' && <ExplorePage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} />}
       {activeView === 'activity' && <NotificationsPage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} />}
       {activeView === 'profile' && <ProfileView creatorId={selectedCreatorId} onSelectVideo={handleSelectVideo} onOpenCreatorStudio={() => setActiveView('creator_studio')} onOpenMyPurchases={() => setActiveView('purchases')} onOpenWallet={() => setWalletModalOpen(true)} onOpenUpload={() => setUploadModalOpen(true)} onOpenLgpd={() => setLgpdModalOpen(true)} onOpenAuth={() => setAuthModalOpen(true)} />}
-      {activeView === 'creator_studio' && <CreatorDashboard onOpenUpload={() => setUploadModalOpen(true)} onSelectVideo={handleSelectVideo} />}
+      {activeView === 'creator_studio' && <CreatorDashboard onOpenUpload={() => setCreateHubOpen(true)} onOpenLive={() => setActiveView('live_studio')} onSelectVideo={handleSelectVideo} />}
       {activeView === 'purchases' && <MyPurchasesPage onSelectVideo={handleSelectVideo} onBack={() => setActiveView('profile')} />}
       {activeView === 'admin' && <AdminCommandCenter onSelectVideo={handleSelectVideo} />}
       {activeView === 'live' && <LivePage onBack={() => setActiveView('feed')} />}
