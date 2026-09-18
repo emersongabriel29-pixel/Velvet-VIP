@@ -21,3 +21,14 @@
 - Fazer teste de invasão antes do lançamento.
 - Revisar RLS com contas anon, usuário, criador e admin.
 - Definir retenção, exclusão e resposta a incidentes conforme LGPD.
+
+## Gate final
+
+- [ ] Evidências de staging real anexadas ao registro de lançamento.
+- [ ] Restore drill concluído e registrado.
+- [ ] Provedores externos efetivamente conectados e testados.
+- [ ] Pentest/revisão final concluído após configuração da infraestrutura.
+- [ ] LGPD/jurídico/política de conteúdo revisados.
+- [ ] Plano de rollback e responsáveis operacionais definidos.
+
+Enquanto qualquer item obrigatório estiver pendente, o estado é **NO-GO** para usuários e dinheiro reais.
