@@ -13,12 +13,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
         with:
-          bun-version: latest
-      - run: bun install --frozen-lockfile
-      - name: Dependency audit (informational until qs remediation)
-        run: bun audit
-        continue-on-error: true
-      - run: bun run typecheck
-      - run: bun run build
+          node-version: 22
+      - run: npm install
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Reject committed secrets
+        shell: bash
+        run: |
+          if git grep -nE '(sk_live_[A-Za-z0-9]{16,}|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' -- ':!package-lock.json' ':!SECURITY*' ':!.github/workflows/security.yml'; then
+            echo 'Potential secret committed to repository'; exit 1
+          fi
