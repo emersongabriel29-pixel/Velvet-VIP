@@ -50,6 +50,8 @@ export interface Video {
   thumbnail_url: string;
   duration_seconds: number;
   aspect_ratio: string;
+  content_kind?: 'short' | 'long';
+  orientation?: 'vertical' | 'horizontal' | 'square';
   is_premium: boolean;
   content_level?: 'sensual' | 'explicit';
   access_type?: 'free' | 'subscription' | 'pay_per_view';
