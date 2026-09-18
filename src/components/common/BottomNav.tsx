@@ -68,7 +68,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         {/* Atividade (Notificações) */}
         <button
           id="nav-btn-activity"
-          onClick={() => isAuthenticated ? onViewChange('activity') : onOpenAuthModal()}
+          onClick={() => onViewChange('activity')}
           className={`relative flex flex-col items-center justify-center flex-1 py-1 gap-1 transition-colors cursor-pointer ${
             activeView === 'activity' ? 'text-white' : 'text-zinc-400 hover:text-zinc-200'
           }`}
