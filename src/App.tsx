@@ -21,6 +21,8 @@ import { LgpdTermsModal } from './components/legal/LgpdTermsModal';
 import { MonetizationPage } from './components/monetization/MonetizationPage';
 import { LivePage } from './components/live/LivePage';
 import { CommunityPage } from './components/community/CommunityPage';
+import { CreateHub } from './components/creator/CreateHub';
+import { LiveStudio } from './components/live/LiveStudio';
 
 const VelvetVipApp: React.FC = () => {
   const { hasConsented18Plus } = useAuth();
@@ -28,6 +30,8 @@ const VelvetVipApp: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<FeedTab>('foryou');
   const [selectedCreatorId, setSelectedCreatorId] = useState<string | undefined>(undefined);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [createHubOpen, setCreateHubOpen] = useState(false);
+  const [uploadMode, setUploadMode] = useState<'short' | 'long'>('short');
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -41,9 +45,6 @@ const VelvetVipApp: React.FC = () => {
     <AgeVerificationModal />
     <Header currentTab={currentTab} onTabChange={(tab) => { setCurrentTab(tab); setActiveView('feed'); }} activeView={activeView} onViewChange={(view) => view === 'profile' ? handleOpenProfile() : setActiveView(view)} onOpenSupabaseModal={() => setSupabaseModalOpen(true)} onOpenWalletModal={() => setWalletModalOpen(true)} onOpenLanding={() => setActiveView('landing')} onOpenAuthModal={() => setAuthModalOpen(true)} onOpenLgpdModal={() => setLgpdModalOpen(true)} />
     <main className="w-full">
-      {activeView !== 'landing' && <button onClick={() => setActiveView('live')} className="fixed right-4 top-32 z-30 rounded-full border border-emerald-500/40 bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-lg hover:bg-emerald-500">Lives</button>}
-      {activeView !== 'landing' && <button onClick={() => setActiveView('community')} className="fixed right-4 top-44 z-30 rounded-full border border-violet-500/40 bg-violet-600 px-3 py-2 text-xs font-bold text-white shadow-lg hover:bg-violet-500">Comunidade</button>}
-      {activeView !== 'landing' && <button onClick={() => setActiveView('monetization')} className="fixed right-4 top-20 z-30 rounded-full border border-rose-500/40 bg-rose-600 px-3 py-2 text-xs font-bold text-white shadow-lg hover:bg-rose-500">Planos e ganhos</button>}
       {activeView === 'feed' && <VideoFeed currentTab={currentTab} onSelectCreator={handleSelectCreator} onOpenUpload={() => setUploadModalOpen(true)} />}
       {activeView === 'explore' && <ExplorePage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} />}
       {activeView === 'activity' && <NotificationsPage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} />}
@@ -52,12 +53,14 @@ const VelvetVipApp: React.FC = () => {
       {activeView === 'purchases' && <MyPurchasesPage onSelectVideo={handleSelectVideo} onBack={() => setActiveView('profile')} />}
       {activeView === 'admin' && <AdminCommandCenter onSelectVideo={handleSelectVideo} />}
       {activeView === 'live' && <LivePage onBack={() => setActiveView('feed')} />}
+      {activeView === 'live_studio' && <LiveStudio onBack={() => setActiveView('creator_studio')} onOpenLives={() => setActiveView('live')} />}
       {activeView === 'community' && <CommunityPage onBack={() => setActiveView('feed')} />}
       {activeView === 'monetization' && <MonetizationPage onBack={() => setActiveView('feed')} />}
       {activeView === 'landing' && <LandingPage onEnterApp={() => setActiveView('feed')} onOpenUpload={() => setUploadModalOpen(true)} />}
     </main>
-    {activeView !== 'landing' && <BottomNav activeView={activeView} onViewChange={(view) => view === 'profile' ? handleOpenProfile() : setActiveView(view)} onOpenUploadModal={() => setUploadModalOpen(true)} />}
-    <UploadModal isOpen={uploadModalOpen} onClose={() => setUploadModalOpen(false)} onSuccess={() => { setActiveView('feed'); setCurrentTab('foryou'); }} />
+    {activeView !== 'landing' && <BottomNav activeView={activeView} onViewChange={(view) => view === 'profile' ? handleOpenProfile() : setActiveView(view)} onOpenUploadModal={() => setCreateHubOpen(true)} />}
+    <CreateHub isOpen={createHubOpen} onClose={() => setCreateHubOpen(false)} onShortVideo={() => { setUploadMode('short'); setUploadModalOpen(true); }} onLongVideo={() => { setUploadMode('long'); setUploadModalOpen(true); }} onLive={() => setActiveView('live_studio')} />
+    <UploadModal mode={uploadMode} isOpen={uploadModalOpen} onClose={() => setUploadModalOpen(false)} onSuccess={() => { setActiveView('feed'); setCurrentTab('foryou'); }} />
     <WalletModal isOpen={walletModalOpen} onClose={() => setWalletModalOpen(false)} />
     <SupabaseConfigModal isOpen={supabaseModalOpen} onClose={() => setSupabaseModalOpen(false)} />
     <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} onOpenTerms={() => { setAuthModalOpen(false); setLgpdModalOpen(true); }} />
