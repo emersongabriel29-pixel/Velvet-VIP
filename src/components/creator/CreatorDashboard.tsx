@@ -14,13 +14,16 @@ import {
   QrCode,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Star
 } from 'lucide-react';
 import { Creator, Video, Withdrawal } from '../../types';
 import { dbService } from '../../services/db';
 import { useAuth } from '../../hooks/useAuth';
 import { CreatorAnalyticsPanel } from './CreatorAnalyticsPanel';
 import { CreatorPlansManager } from './CreatorPlansManager';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { uploadProfileImage } from '../../services/media';
 
 interface CreatorDashboardProps {
   onOpenUpload: () => void;
@@ -32,7 +35,11 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   onSelectVideo,
 }) => {
   const { currentCreator } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'videos' | 'plans' | 'payouts'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'videos' | 'highlights' | 'plans' | 'payouts'>('overview');
+  const [highlights,setHighlights]=useState<any[]>([]);
+  const [highlightTitle,setHighlightTitle]=useState('');
+  const [highlightFile,setHighlightFile]=useState<File|null>(null);
+  const [highlightMessage,setHighlightMessage]=useState('');
   const [videos, setVideos] = useState<Video[]>([]);
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
 
@@ -75,8 +82,13 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
     }
   };
 
+  const loadHighlights = async () => { if(!isSupabaseConfigured || !supabase || !creator.id) return; const {data}=await supabase.from('creator_highlights').select('*').eq('creator_id',creator.id).order('sort_order').order('created_at',{ascending:false}); setHighlights(data||[]); };
+  const createHighlight = async () => { if(!highlightTitle.trim() || !highlightFile || !supabase){setHighlightMessage('Informe um título e escolha uma imagem.');return;} try{const media_url=await uploadProfileImage(highlightFile,'cover');const {error}=await supabase.from('creator_highlights').insert({creator_id:creator.id,title:highlightTitle.trim(),cover_url:media_url,media_url,media_type:'image',sort_order:highlights.length});if(error)throw error;setHighlightTitle('');setHighlightFile(null);setHighlightMessage('Destaque publicado.');await loadHighlights();}catch(e:any){setHighlightMessage(e.message||'Erro ao publicar destaque.');}};
+  const deleteHighlight = async (id:string) => { if(!supabase||!confirm('Excluir este destaque?'))return;await supabase.from('creator_highlights').delete().eq('id',id);await loadHighlights(); };
+
   useEffect(() => {
     loadData();
+    loadHighlights();
     setBasicPrice(creator.subscription_price_basic || 29.90);
     setVipPrice(creator.subscription_price_vip || 59.90);
   }, [currentCreator]);
@@ -245,6 +257,8 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
           Gerenciar Vídeos ({videos.length})
         </button>
 
+        <button onClick={() => setActiveTab('highlights')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${activeTab === 'highlights' ? 'bg-rose-600 text-white shadow-md' : 'bg-zinc-900 text-zinc-400 hover:text-white'}`}><Star className="inline mr-1 h-3.5 w-3.5"/>Destaques ({highlights.length})</button>
+
         <button
           onClick={() => setActiveTab('plans')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
@@ -391,6 +405,18 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {activeTab === 'highlights' && (
+        <div className="space-y-4">
+          <div className="rounded-3xl border border-zinc-800 bg-[#141419] p-5">
+            <h3 className="font-bold">Lives e destaques do perfil</h3>
+            <p className="mt-1 text-xs text-zinc-400">Publique destaques que qualquer visitante poderá ver antes de assinar.</p>
+            {highlightMessage && <p className="mt-3 text-xs text-amber-300">{highlightMessage}</p>}
+            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto]"><input value={highlightTitle} onChange={e=>setHighlightTitle(e.target.value)} maxLength={40} placeholder="Título do destaque" className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"/><label className="cursor-pointer rounded-xl border border-zinc-700 px-4 py-2 text-xs font-bold">Escolher imagem<input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e=>setHighlightFile(e.target.files?.[0]||null)}/></label><button onClick={createHighlight} className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold">Publicar</button></div>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-2">{highlights.map(h=><div key={h.id} className="w-28 shrink-0 text-center"><div className="mx-auto h-20 w-20 overflow-hidden rounded-full border-2 border-rose-500 bg-zinc-900">{h.cover_url && <img src={h.cover_url} className="h-full w-full object-cover" alt={h.title}/>}</div><p className="mt-2 truncate text-xs font-bold">{h.title}</p><button onClick={()=>deleteHighlight(h.id)} className="mt-1 text-[10px] text-rose-400">Excluir</button></div>)}{highlights.length===0&&<p className="text-sm text-zinc-500">Nenhum destaque publicado.</p>}</div>
         </div>
       )}
 
