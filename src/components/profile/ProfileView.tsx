@@ -181,7 +181,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   return (
     <div className="min-h-screen bg-[#09090b] text-white pt-14 pb-20 max-w-4xl mx-auto px-3 sm:px-6">
       {/* Cover Banner */}
-      <div className="relative h-44 sm:h-56 rounded-3xl overflow-hidden bg-gradient-to-r from-rose-950/60 via-zinc-900 to-amber-950/40 border border-zinc-800 shadow-xl mb-14">
+      <div className="relative h-44 sm:h-56 rounded-3xl overflow-hidden bg-gradient-to-r from-rose-950/60 via-zinc-900 to-amber-950/40 border border-zinc-800 shadow-xl mb-16">
         {coverPreview && (
           <img
             src={coverPreview}
@@ -190,6 +190,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             referrerPolicy="no-referrer"
           />
         )}
+        {!coverPreview && <div className="absolute inset-0 flex items-center justify-center"><div className="text-center"><div className="text-2xl sm:text-3xl font-black">VELVET <span className="text-rose-500">VIP</span></div><div className="mt-1 text-[10px] font-bold uppercase tracking-[.3em] text-zinc-500">Conteúdo exclusivo 18+</div></div></div>}
         <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-transparent to-transparent" />
 
         {/* Action button on top right of cover */}
@@ -214,14 +215,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
 
         {/* Floating Avatar */}
-        <div className="absolute -bottom-10 left-6 flex items-end gap-4">
+        <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 flex items-end gap-4">
           <div className="relative">
             <img
               src={avatarPreview || creator?.avatar_url || currentUser.avatar_url || 'https://placehold.co/256x256?text=Foto'}
               alt="Avatar"
-              className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover border-4 border-[#09090b] shadow-2xl bg-zinc-800"
+              className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-4 shadow-2xl bg-zinc-800 ${profileLives.some(l => l.status === "live") ? "border-rose-500 ring-4 ring-rose-500/25" : "border-[#09090b]"}`}
               referrerPolicy="no-referrer"
             />
+            {profileLives.some(l => l.status === "live") && <button type="button" onClick={onOpenLive} className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-rose-600 px-3 py-1 text-[10px] font-black text-white shadow-lg">AO VIVO</button>}
             {creator?.verified && (
               <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-500 border-2 border-[#09090b] flex items-center justify-center text-white shadow">
                 <Crown className="w-4 h-4 fill-white" />
@@ -387,7 +389,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       </div>
 
-      {creator && profileLives.length > 0 && <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="font-bold flex items-center gap-2"><Radio className="w-4 h-4 text-rose-500"/>Lives</h2>{onOpenLive && <button onClick={onOpenLive} className="text-xs text-rose-400">Ver todas</button>}</div><div className="flex gap-3 overflow-x-auto pb-2">{profileLives.map(l=><button key={l.id} onClick={onOpenLive} className="min-w-56 text-left rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><span className={`text-[10px] font-black ${l.status==='live'?'text-rose-400':'text-amber-300'}`}>{l.status==='live'?'● AO VIVO':'AGENDADA'}</span><p className="mt-2 text-sm font-bold">{l.title}</p><p className="mt-1 text-[11px] text-zinc-500">{l.required_plan?.toUpperCase()}</p></button>)}</div></section>}
+      {creator && profileLives.length > 0 && <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="font-bold flex items-center gap-2"><Radio className="w-4 h-4 text-rose-500"/>Lives e destaques</h2>{onOpenLive && <button onClick={onOpenLive} className="text-xs text-rose-400">Ver todas</button>}</div><div className="flex gap-3 overflow-x-auto pb-2">{profileLives.map(l=><button key={l.id} onClick={onOpenLive} className="min-w-56 text-left rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><span className={`text-[10px] font-black ${l.status==='live'?'text-rose-400':'text-amber-300'}`}>{l.status==='live'?'● AO VIVO':'AGENDADA'}</span><p className="mt-2 text-sm font-bold">{l.title}</p><p className="mt-1 text-[11px] text-zinc-500">{l.required_plan?.toUpperCase()}</p></button>)}</div></section>}
 
       {/* Profile Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto border-b border-zinc-800 pb-3 mb-4">
