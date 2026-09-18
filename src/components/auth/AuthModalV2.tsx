@@ -6,7 +6,7 @@ import { isSupabaseConfigured } from '../../lib/supabase';
 interface AuthModalProps { isOpen: boolean; onClose: () => void; onOpenTerms?: () => void; defaultMode?: 'login' | 'register'; }
 
 export const AuthModalV2: React.FC<AuthModalProps> = ({ isOpen, onClose, onOpenTerms, defaultMode = 'login' }) => {
-  const { login, register, switchUser, allUsers } = useAuth();
+  const { login, register, requestPasswordReset, switchUser, allUsers } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>(defaultMode);
   const [email, setEmail] = useState(''); const [password, setPassword] = useState('');
   const [name, setName] = useState(''); const [username, setUsername] = useState(''); const [birthDate, setBirthDate] = useState(''); const [role, setRole] = useState<'user' | 'creator'>('user');
@@ -31,6 +31,17 @@ export const AuthModalV2: React.FC<AuthModalProps> = ({ isOpen, onClose, onOpenT
     catch (err: any) { setError(err?.message || 'Não foi possível criar a conta.'); }
     finally { setLoading(false); }
   };
+  const forgotPassword = async () => {
+    setError(''); setSuccess('');
+    if (!email.trim()) return setError('Informe seu e-mail primeiro.');
+    setLoading(true);
+    try {
+      await requestPasswordReset(email.trim());
+      setSuccess('Se o e-mail estiver cadastrado, enviaremos um link seguro para redefinir a senha.');
+    } catch {
+      setSuccess('Se o e-mail estiver cadastrado, enviaremos um link seguro para redefinir a senha.');
+    } finally { setLoading(false); }
+  };
   const quickLogin = (wanted: 'creator' | 'user' | 'admin') => { const u = allUsers.find(x => x.role === wanted); if (u) { switchUser(u.id); setSuccess(`Demonstração: ${u.name}`); setTimeout(onClose, 500); } };
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
@@ -43,6 +54,7 @@ export const AuthModalV2: React.FC<AuthModalProps> = ({ isOpen, onClose, onOpenT
       {mode === 'login' ? <form onSubmit={submitLogin} className="space-y-4">
         <label className="block text-xs text-zinc-300">E-mail<input value={email} onChange={e => setEmail(e.target.value)} type="email" required autoComplete="email" className="mt-1.5 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm text-white outline-none focus:border-rose-500" /></label>
         <label className="block text-xs text-zinc-300">Senha<div className="relative mt-1.5"><Lock className="absolute left-3 top-3.5 h-4 w-4 text-zinc-500" /><input value={password} onChange={e => setPassword(e.target.value)} type={showPassword ? 'text' : 'password'} required autoComplete="current-password" className="w-full rounded-xl border border-zinc-700 bg-zinc-900 py-3 pl-10 pr-10 text-sm text-white outline-none focus:border-rose-500" /><button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-3 text-zinc-500">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></label>
+        <button type="button" onClick={forgotPassword} disabled={loading} className="w-full text-right text-[11px] text-zinc-400 hover:text-rose-300">Esqueci minha senha</button>
         <button disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 py-3 text-xs font-bold text-white disabled:opacity-50">{loading ? 'Entrando...' : 'Entrar na plataforma'} <ArrowRight className="h-4 w-4" /></button>
         {!isSupabaseConfigured && <div className="border-t border-zinc-800 pt-4"><p className="mb-2 text-center text-[11px] text-zinc-500">Modo demonstração local</p><div className="grid grid-cols-3 gap-2"><button type="button" onClick={() => quickLogin('creator')} className="rounded-xl bg-zinc-900 p-2 text-[10px] text-amber-300"><Crown className="mx-auto mb-1 h-4 w-4" />Criador</button><button type="button" onClick={() => quickLogin('user')} className="rounded-xl bg-zinc-900 p-2 text-[10px] text-sky-300"><UserIcon className="mx-auto mb-1 h-4 w-4" />Membro</button><button type="button" onClick={() => quickLogin('admin')} className="rounded-xl bg-zinc-900 p-2 text-[10px] text-rose-300"><ShieldCheck className="mx-auto mb-1 h-4 w-4" />Admin</button></div></div>}
       </form> : <form onSubmit={submitRegister} className="space-y-3">
