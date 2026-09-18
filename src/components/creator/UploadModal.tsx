@@ -3,6 +3,7 @@ import { X, Upload, Film, CheckCircle2, Sparkles, Image, Lock, Globe, Users } fr
 import { dbService } from '../../services/db';
 
 interface UploadModalProps {
+  mode?: 'short' | 'long';
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
@@ -31,7 +32,7 @@ const SAMPLE_PRESET_VIDEOS = [
   }
 ];
 
-export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuccess }) => {
+export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen, onClose, onSuccess }) => {
   const [videoUrl, setVideoUrl] = useState(SAMPLE_PRESET_VIDEOS[0].url);
   const [thumbnailUrl, setThumbnailUrl] = useState(SAMPLE_PRESET_VIDEOS[0].thumb);
   const [title, setTitle] = useState('');
@@ -147,7 +148,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
         <div className="p-4 sm:p-5 border-b border-zinc-800 bg-[#16161d] flex items-center justify-between">
           <div className="flex items-center gap-2 text-rose-500">
             <Film className="w-5 h-5" />
-            <h3 className="font-bold text-white text-base font-display">Publicar Novo Vídeo Vertical (9:16)</h3>
+            <h3 className="font-bold text-white text-base font-display">{mode === 'long' ? 'Publicar Vídeo Longo' : 'Publicar Novo Vídeo Vertical (9:16)'}</h3>
           </div>
           <button
             onClick={onClose}
@@ -188,9 +189,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
               {/* Vertical video live preview */}
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-zinc-300">
-                  Prévia Vertical (9:16):
+                  {mode === 'long' ? 'Prévia do vídeo longo:' : 'Prévia Vertical (9:16):'}
                 </label>
-                <div className="relative aspect-[9/16] w-44 mx-auto rounded-2xl overflow-hidden bg-black border border-zinc-700 shadow-lg">
+                <div className={`relative ${mode === 'long' ? 'aspect-video w-full' : 'aspect-[9/16] w-44'} mx-auto rounded-2xl overflow-hidden bg-black border border-zinc-700 shadow-lg`}>
                   <video
                     ref={videoPreviewRef}
                     src={videoUrl}
@@ -199,7 +200,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
                     className="w-full h-full object-cover"
                   />
                   <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/60 backdrop-blur-md text-[10px] text-white font-bold">
-                    9:16 HD
+                    {mode === 'long' ? 'VÍDEO LONGO' : '9:16 HD'}
                   </span>
                 </div>
               </div>
