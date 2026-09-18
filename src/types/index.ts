@@ -55,6 +55,7 @@ export interface Video {
   is_premium: boolean;
   content_level?: 'sensual' | 'explicit';
   access_type?: 'free' | 'subscription' | 'pay_per_view';
+  anonymous_access?: boolean;
   premium_price?: number; // Pay-per-view price in R$
   required_tier?: 'free' | 'basic' | 'vip';
   category: string;
