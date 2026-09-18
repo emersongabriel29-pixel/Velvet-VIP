@@ -11,7 +11,7 @@ const safeExt = (file: File) => {
 export async function uploadCreatorVideo(input:{
   file:File; thumbnail?:Blob|null; title:string; description:string; category:string; hashtags:string[];
   isPremium:boolean; premiumPrice:number; requiredTier:'free'|'basic'|'vip'; isDraft:boolean; contentKind:'short'|'long';
-  durationSeconds:number;
+  durationSeconds:number; anonymousAccess:boolean; accessType:'free'|'subscription'|'pay_per_view';
 }):Promise<{id:string;storagePath:string}>{
   if (!isSupabaseConfigured || !supabase) throw new Error(isDemoMode ? 'Upload real indisponível no modo demonstração.' : 'Supabase não configurado.');
   if (!VIDEO_MIME.has(input.file.type)) throw new Error('Formato inválido. Use MP4, WEBM ou MOV.');
@@ -44,7 +44,8 @@ export async function uploadCreatorVideo(input:{
       content_kind:input.contentKind,is_premium:input.isPremium,
       premium_price:input.isPremium?input.premiumPrice:0,
       required_tier:input.isPremium?input.requiredTier:'free',
-      category:input.category,hashtags:input.hashtags,is_draft:input.isDraft
+      category:input.category,hashtags:input.hashtags,is_draft:input.isDraft,
+      access_type:input.accessType,content_level:'sensual',anonymous_access:input.anonymousAccess
     }).select('id').single();
     if(inserted.error||!inserted.data) throw new Error(inserted.error?.message||'Falha ao registrar o vídeo.');
     return {id:inserted.data.id,storagePath:videoPath};
