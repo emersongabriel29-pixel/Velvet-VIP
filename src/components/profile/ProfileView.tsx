@@ -15,12 +15,17 @@ import {
   ShieldCheck,
   Wallet,
   Scale,
-  LogIn
+  LogIn,
+  Camera,
+  Share2,
+  Radio
 } from 'lucide-react';
 import { Creator, Video } from '../../types';
 import { dbService } from '../../services/db';
 import { useAuth } from '../../hooks/useAuth';
 import { SubscribeModal } from '../creator/SubscribeModal';
+import { isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { uploadProfileImage, getProfileImageUrl } from '../../services/media';
 
 interface ProfileViewProps {
   creatorId?: string; // If passed, views that creator. If undefined, views current logged-in user!
@@ -31,6 +36,7 @@ interface ProfileViewProps {
   onOpenUpload: () => void;
   onOpenLgpd?: () => void;
   onOpenAuth?: () => void;
+  onOpenLive?: () => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
@@ -42,6 +48,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenUpload,
   onOpenLgpd,
   onOpenAuth,
+  onOpenLive,
 }) => {
   const { currentUser, currentCreator, isAuthenticated, updateProfile } = useAuth();
   const [creator, setCreator] = useState<Creator | undefined>(undefined);
@@ -52,6 +59,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [bioInput, setBioInput] = useState('');
+  const [avatarPreview, setAvatarPreview] = useState('');
+  const [coverPreview, setCoverPreview] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [profileError, setProfileError] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileLives, setProfileLives] = useState<any[]>([]);
 
   const isOwnProfile = isAuthenticated && (!creatorId || (currentCreator && currentCreator.id === creatorId) || (creator && creator.user_id === currentUser.id));
 
@@ -77,6 +91,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
     setNameInput(currentUser.name);
     setBioInput(currentUser.bio || '');
+    Promise.all([getProfileImageUrl(creator?.avatar_url || currentUser.avatar_url || ''), getProfileImageUrl(creator?.cover_url || '')]).then(([a,cv])=>{ setAvatarPreview(a); setCoverPreview(cv); });
   }, [creatorId, currentCreator, currentUser]);
 
   const handleToggleFollow = () => {
@@ -86,9 +101,45 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setCreator(dbService.getCreatorById(creator.id));
   };
 
+  useEffect(() => {
+    if (!creator?.id || !isSupabaseConfigured || !supabase) { setProfileLives([]); return; }
+    supabase.from('live_sessions').select('id,title,status,scheduled_at,required_plan').eq('creator_id',creator.id).in('status',['live','scheduled']).order('scheduled_at',{ascending:true})
+      .then(({data})=>setProfileLives(data || []));
+  }, [creator?.id]);
+
+  const pickImage = (file:File|undefined, kind:'avatar'|'cover') => {
+    if(!file) return;
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size > 8*1024*1024){ setProfileError('Use JPG, PNG ou WEBP com até 8 MB.'); return; }
+    const url=URL.createObjectURL(file);
+    if(kind==='avatar'){setAvatarFile(file);setAvatarPreview(url);}else{setCoverFile(file);setCoverPreview(url);}
+    setProfileError('');
+  };
+
   const handleSaveProfile = async () => {
-    await updateProfile({ name: nameInput, bio: bioInput });
-    setIsEditingBio(false);
+    if (!avatarPreview && !currentUser.avatar_url && !creator?.avatar_url) { setProfileError('A foto de perfil é obrigatória.'); return; }
+    setSavingProfile(true); setProfileError('');
+    try {
+      let avatarRef=currentUser.avatar_url;
+      if(avatarFile) avatarRef=isSupabaseConfigured ? await uploadProfileImage(avatarFile,'avatar') : avatarPreview;
+      await updateProfile({ name:nameInput, bio:bioInput, avatar_url:avatarRef });
+      if(creator && isSupabaseConfigured && supabase){
+        let coverRef=creator.cover_url || '';
+        if(coverFile) coverRef=await uploadProfileImage(coverFile,'cover');
+        const {error}=await supabase.from('creators').update({display_name:nameInput,bio:bioInput,avatar_url:avatarRef,cover_url:coverRef}).eq('id',creator.id);
+        if(error) throw error;
+        setCreator(prev=>prev?{...prev,display_name:nameInput,bio:bioInput,avatar_url:avatarRef,cover_url:coverRef}:prev);
+      } else if(creator) {
+        dbService.updateCreator(creator.id,{display_name:nameInput,bio:bioInput,avatar_url:avatarRef,cover_url:coverPreview || creator.cover_url});
+      }
+      setAvatarFile(null); setCoverFile(null); setIsEditingBio(false);
+    } catch(err:any){ setProfileError(err?.message || 'Não foi possível salvar o perfil.'); }
+    finally { setSavingProfile(false); }
+  };
+
+  const shareProfile = async () => {
+    const url=`${window.location.origin}${window.location.pathname}#creator=${creator?.id || currentUser.id}`;
+    const data={title:creator?.display_name || currentUser.name,text:`Veja o perfil de ${creator?.display_name || currentUser.name} no Velvet VIP`,url};
+    try { if(navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(url); alert('Link do perfil copiado.'); } } catch {}
   };
 
   // Filter videos according to tab
@@ -103,9 +154,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     <div className="min-h-screen bg-[#09090b] text-white pt-14 pb-20 max-w-4xl mx-auto px-3 sm:px-6">
       {/* Cover Banner */}
       <div className="relative h-44 sm:h-56 rounded-3xl overflow-hidden bg-gradient-to-r from-rose-950/60 via-zinc-900 to-amber-950/40 border border-zinc-800 shadow-xl mb-14">
-        {creator?.cover_url && (
+        {coverPreview && (
           <img
-            src={creator.cover_url}
+            src={coverPreview}
             alt="Cover"
             className="w-full h-full object-cover opacity-60"
             referrerPolicy="no-referrer"
@@ -138,7 +189,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <div className="absolute -bottom-10 left-6 flex items-end gap-4">
           <div className="relative">
             <img
-              src={creator?.avatar_url || currentUser.avatar_url}
+              src={avatarPreview || creator?.avatar_url || currentUser.avatar_url || 'https://placehold.co/256x256?text=Foto'}
               alt="Avatar"
               className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl object-cover border-4 border-[#09090b] shadow-2xl bg-zinc-800"
               referrerPolicy="no-referrer"
@@ -168,6 +219,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
           {/* Profile CTA Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
+            <button type="button" onClick={shareProfile} className="px-3.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white font-semibold text-xs flex items-center gap-1.5"><Share2 className="w-4 h-4" /> Compartilhar perfil</button>
             {isOwnProfile ? (
               <>
                 {currentUser.role === 'creator' && currentCreator?.is_approved === true && (
@@ -271,6 +323,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         {/* Bio */}
         {isEditingBio ? (
           <div id="profile-edit-panel" className="scroll-mt-20 p-4 bg-zinc-900 rounded-2xl border border-zinc-800 space-y-3">
+            {profileError && <p className="text-xs text-rose-400">{profileError}</p>}
+            <div className="grid sm:grid-cols-2 gap-3"><label className="rounded-xl border border-zinc-700 p-3 text-xs text-zinc-300 cursor-pointer"><Camera className="inline w-4 h-4 mr-2"/>Foto de perfil *<input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e=>pickImage(e.target.files?.[0],'avatar')} /></label><label className="rounded-xl border border-zinc-700 p-3 text-xs text-zinc-300 cursor-pointer"><Camera className="inline w-4 h-4 mr-2"/>Alterar capa (opcional)<input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e=>pickImage(e.target.files?.[0],'cover')} /></label></div><p className="text-[11px] text-zinc-500">A foto é obrigatória. A capa é opcional; sem capa, permanece o padrão Velvet.</p>
             <div>
               <label className="block text-xs font-semibold text-zinc-400 mb-1">Nome</label>
               <input
@@ -298,6 +352,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </button>
               <button
                 onClick={handleSaveProfile}
+                disabled={savingProfile}
                 className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-lg"
               >
                 Salvar Alterações
@@ -343,6 +398,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           )}
         </div>
       </div>
+
+      {creator && profileLives.length > 0 && <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="font-bold flex items-center gap-2"><Radio className="w-4 h-4 text-rose-500"/>Lives</h2>{onOpenLive && <button onClick={onOpenLive} className="text-xs text-rose-400">Ver todas</button>}</div><div className="flex gap-3 overflow-x-auto pb-2">{profileLives.map(l=><button key={l.id} onClick={onOpenLive} className="min-w-56 text-left rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><span className={`text-[10px] font-black ${l.status==='live'?'text-rose-400':'text-amber-300'}`}>{l.status==='live'?'● AO VIVO':'AGENDADA'}</span><p className="mt-2 text-sm font-bold">{l.title}</p><p className="mt-1 text-[11px] text-zinc-500">{l.required_plan?.toUpperCase()}</p></button>)}</div></section>}
 
       {/* Profile Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto border-b border-zinc-800 pb-3 mb-4">
