@@ -110,7 +110,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     if (videoRef.current) {
       const current = videoRef.current.currentTime;
       const duration = videoRef.current.duration || 1;
-      setProgress((current / duration) * 100);
+      const isLong = video.content_kind === 'long' || video.duration_seconds >= 60;
+      const previewLimit = 15;
+      if (isLong && current >= previewLimit) { videoRef.current.currentTime = 0; setProgress(0); return; }
+      setProgress((current / (isLong ? Math.min(duration, previewLimit) : duration)) * 100);
     }
   };
 
@@ -195,6 +198,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             isLocked ? 'filter blur-2xl brightness-50 scale-105' : ''
           }`}
         />
+
+        {(video.content_kind === 'long' || video.duration_seconds >= 60) && <div className="absolute top-16 sm:top-4 left-4 z-30 rounded-lg bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-md">PRÉVIA • 15s • VÍDEO LONGO</div>}
 
         {/* Double-tap heart burst animation */}
         {showHeartBurst && (
