@@ -6,3 +6,5 @@ test('payment credit validates amount and currency',()=>{assert.match(hook,/expe
 test('payment anomalies have admin-only audit trail',()=>{assert.match(sql,/payment_security_events enable row level security/);assert.match(sql,/record_payment_security_event/);});
 test('ledger has provider reference idempotency primitive',()=>{assert.match(sql,/wallet_ledger_provider_reference_unique/);});
 test('payment endpoint CORS is allowlisted and no-store',()=>{assert.match(create,/ALLOWED_ORIGINS/);assert.match(create,/Cache-Control':'no-store'/);assert.doesNotMatch(create,/Access-Control-Allow-Origin': '\*'/);});
+
+test('provider events are normalized and idempotent',()=>{assert.match(sql,/payment_provider_events/);assert.match(sql,/unique\(provider,external_event_id\)/);});
