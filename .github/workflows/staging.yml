@@ -1,0 +1,31 @@
+name: Staging gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+jobs:
+  staging-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Staging configuration contract
+        run: npm run test:staging-contract
+      - name: Real staging integration suite
+        if: ${{ secrets.STAGING_SUPABASE_URL != '' && secrets.STAGING_SUPABASE_ANON_KEY != '' }}
+        env:
+          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          STAGING_TEST_USER_A_EMAIL: ${{ secrets.STAGING_TEST_USER_A_EMAIL }}
+          STAGING_TEST_USER_A_PASSWORD: ${{ secrets.STAGING_TEST_USER_A_PASSWORD }}
+          STAGING_TEST_USER_B_EMAIL: ${{ secrets.STAGING_TEST_USER_B_EMAIL }}
+          STAGING_TEST_USER_B_PASSWORD: ${{ secrets.STAGING_TEST_USER_B_PASSWORD }}
+        run: npm run test:staging
+      - name: Explain missing external staging
+        if: ${{ secrets.STAGING_SUPABASE_URL == '' || secrets.STAGING_SUPABASE_ANON_KEY == '' }}
+        run: echo "::notice::Real staging tests were not run because staging secrets are not configured."
