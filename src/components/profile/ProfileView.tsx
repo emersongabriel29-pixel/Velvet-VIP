@@ -67,6 +67,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [profileError, setProfileError] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileLives, setProfileLives] = useState<any[]>([]);
+  const [profileHighlights,setProfileHighlights]=useState<any[]>([]);
 
   const isOwnProfile = isAuthenticated && (!creatorId || (currentCreator && currentCreator.id === creatorId) || (creator && creator.user_id === currentUser.id));
 
@@ -104,8 +105,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   useEffect(() => {
     if (!creator?.id || !isSupabaseConfigured || !supabase) { setProfileLives([]); return; }
-    supabase.from('live_sessions').select('id,title,status,scheduled_at,required_plan').eq('creator_id',creator.id).in('status',['live','scheduled']).order('scheduled_at',{ascending:true})
-      .then(({data})=>setProfileLives(data || []));
+    supabase.from('live_sessions').select('id,title,status,scheduled_at,required_plan').eq('creator_id',creator.id).in('status',['live','scheduled']).order('scheduled_at',{ascending:true}).then(({data})=>setProfileLives(data || []));
+    supabase.from('creator_highlights').select('id,title,cover_url,media_url,media_type').eq('creator_id',creator.id).eq('is_active',true).order('sort_order').order('created_at',{ascending:false}).then(async ({data})=>{const rows=await Promise.all((data||[]).map(async h=>({...h,display_url:await getProfileImageUrl(h.cover_url||h.media_url||'')})));setProfileHighlights(rows);});
   }, [creator?.id]);
 
   const pickImage = (file:File|undefined, kind:'avatar'|'cover') => {
@@ -389,7 +390,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       </div>
 
-      {creator && profileLives.length > 0 && <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="font-bold flex items-center gap-2"><Radio className="w-4 h-4 text-rose-500"/>Lives e destaques</h2>{onOpenLive && <button onClick={onOpenLive} className="text-xs text-rose-400">Ver todas</button>}</div><div className="flex gap-3 overflow-x-auto pb-2">{profileLives.map(l=><button key={l.id} onClick={onOpenLive} className="min-w-56 text-left rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><span className={`text-[10px] font-black ${l.status==='live'?'text-rose-400':'text-amber-300'}`}>{l.status==='live'?'● AO VIVO':'AGENDADA'}</span><p className="mt-2 text-sm font-bold">{l.title}</p><p className="mt-1 text-[11px] text-zinc-500">{l.required_plan?.toUpperCase()}</p></button>)}</div></section>}
+      {creator && (profileLives.length > 0 || profileHighlights.length > 0) && <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="font-bold flex items-center gap-2"><Radio className="w-4 h-4 text-rose-500"/>Lives e destaques</h2>{profileLives.length>0&&onOpenLive&&<button onClick={onOpenLive} className="text-xs text-rose-400">Ver lives</button>}</div><div className="flex gap-4 overflow-x-auto pb-2">{profileLives.map(l=><button key={l.id} onClick={onOpenLive} className="w-24 shrink-0 text-center"><div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border-2 ${l.status==='live'?'border-rose-500 bg-rose-950/30':'border-amber-500 bg-zinc-900'}`}><Radio className={`h-7 w-7 ${l.status==='live'?'text-rose-400':'text-amber-300'}`}/></div><p className="mt-2 truncate text-xs font-bold">{l.status==='live'?'AO VIVO':l.title}</p></button>)}{profileHighlights.map(h=><button key={h.id} className="w-24 shrink-0 text-center"><div className="mx-auto h-20 w-20 overflow-hidden rounded-full border-2 border-zinc-700 bg-zinc-900">{h.display_url&&<img src={h.display_url} alt={h.title} className="h-full w-full object-cover"/>}</div><p className="mt-2 truncate text-xs font-bold">{h.title}</p></button>)}</div></section>}
 
       {/* Profile Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto border-b border-zinc-800 pb-3 mb-4">
