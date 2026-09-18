@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
 import {
   Sparkles,
-  Wallet,
   Database,
   ShieldCheck,
   UserCheck,
   Crown,
   ChevronDown,
-  PlusCircle,
   HelpCircle,
   LogIn,
   FileText,
-  Scale
+  Scale,
+  Grid2X2
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { FeedTab, UserRole } from '../../types';
@@ -149,16 +148,15 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {/* Wallet Balance Pill */}
+          {/* Mais — moved from the bottom navigation/header balance position */}
           <button
-            id="header-wallet-btn"
-            onClick={onOpenWalletModal}
-            title="Carteira & Saldo"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-semibold text-amber-400 hover:border-zinc-700 transition-colors cursor-pointer"
+            id="header-more-btn"
+            onClick={() => onViewChange('more')}
+            title="Mais"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-semibold text-zinc-200 hover:text-white hover:border-zinc-700 transition-colors cursor-pointer"
           >
-            <Wallet className="w-3.5 h-3.5 text-amber-400" />
-            <span>R$ {currentUser.wallet_balance.toFixed(2).replace('.', ',')}</span>
-            <PlusCircle className="w-3 h-3 text-zinc-500 hover:text-amber-400" />
+            <Grid2X2 className="w-3.5 h-3.5 text-zinc-300" />
+            <span>Mais</span>
           </button>
 
           {/* Role Switcher Dropdown (Allows testing as User, Creator, or Admin) */}
