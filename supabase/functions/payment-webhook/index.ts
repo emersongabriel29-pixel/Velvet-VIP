@@ -1,4 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+function hex(bytes:ArrayBuffer){return [...new Uint8Array(bytes)].map(b=>b.toString(16).padStart(2,'0')).join('');}
+async function hmac(secret:string,message:string){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);return hex(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(message)));}
+function safeEqual(a:string,b:string){if(a.length!==b.length)return false;let d=0;for(let i=0;i<a.length;i++)d|=a.charCodeAt(i)^b.charCodeAt(i);return d===0;}
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -9,7 +12,15 @@ Deno.serve(async (req) => {
   const url = Deno.env.get('SUPABASE_URL');
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const mpToken = Deno.env.get('MERCADOPAGO_ACCESS_TOKEN');
-  if (!url || !key || !mpToken) return json({ error: 'Webhook não configurado.' }, 503);
+  const webhookSecret = Deno.env.get('MERCADOPAGO_WEBHOOK_SECRET');
+  if (!url || !key || !mpToken || !webhookSecret) return json({ error: 'Webhook não configurado.' }, 503);
+  const signature=req.headers.get('x-signature')||'', requestId=req.headers.get('x-request-id')||'', requestUrl=new URL(req.url), dataId=requestUrl.searchParams.get('data.id')||'';
+  const parts=Object.fromEntries(signature.split(',').map(p=>p.split('=',2).map(s=>s.trim())).filter(p=>p.length===2));
+  const ts=Number(parts.ts||0), now=Math.floor(Date.now()/1000);
+  if(!Number.isFinite(ts)||Math.abs(now-ts)>300) return json({error:'Assinatura expirada.'},401);
+  const manifest=[`id:${dataId}`]; if(requestId)manifest.push(`request-id:${requestId}`); if(parts.ts)manifest.push(`ts:${parts.ts}`);
+  const expected=await hmac(webhookSecret,`${manifest.join(';')};`);
+  if(!parts.v1||!safeEqual(expected,parts.v1)) return json({error:'Assinatura inválida.'},401);
   const admin = createClient(url, key);
   const payload = await req.json();
   const paymentId = String(payload.data?.id || payload.id || '');
@@ -23,6 +34,10 @@ Deno.serve(async (req) => {
 
   const { data: session } = await admin.from('checkout_sessions').select('*').eq('id', sessionId).single();
   if (!session) return json({ ok: true });
+  const providerAmount=Number(payment.transaction_amount), expectedAmount=Number(session.amount), currency=String(payment.currency_id||'');
+  if(!Number.isFinite(providerAmount)||Math.abs(providerAmount-expectedAmount)>0.001||currency!=='BRL'){
+    return json({error:'Integridade do pagamento inválida.'},409);
+  }
   const eventType = String(payload.type || 'payment');
   const { error: eventError } = await admin.from('payment_events').insert({
     gateway: 'mercadopago', gateway_event_id: String(paymentId), payment_id: String(paymentId),
