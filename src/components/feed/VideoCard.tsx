@@ -195,8 +195,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         {/* Play / Pause indicator icon overlay when paused manually */}
         {!isPlaying && isActive && !isLocked && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-            <div className="w-16 h-16 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white/90">
-              <div className="w-0 h-0 border-y-[12px] border-y-transparent border-l-[20px] border-l-white ml-1" />
+            <div className="w-12 h-12 rounded-full bg-black/45 backdrop-blur-md flex items-center justify-center text-white/90">
+              <div className="w-0 h-0 border-y-[9px] border-y-transparent border-l-[15px] border-l-white ml-1" />
             </div>
           </div>
         )}
@@ -272,7 +272,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         {/* Right Interaction Sidebar */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-3 bottom-24 sm:bottom-20 z-20 flex flex-col items-center gap-4 text-white"
+          className="absolute right-3 bottom-24 sm:bottom-20 z-20 flex flex-col items-center gap-3 text-white"
         >
           {/* Creator Avatar with Follow button */}
           <div className="relative mb-2">
@@ -432,8 +432,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
           {/* Hashtags */}
           {video.hashtags && video.hashtags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-0.5">
-              {video.hashtags.map((tag, idx) => (
+            <div className="flex flex-wrap gap-1 pt-0.5">
+              {(expandDesc ? video.hashtags : video.hashtags.slice(0, 3)).map((tag, idx) => (
                 <span
                   key={idx}
                   onClick={() => onTagClick?.(tag)}
@@ -446,7 +446,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           )}
 
           {/* Premium tag pill */}
-          {video.is_premium && (
+          {video.is_premium && expandDesc && (
             <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-extrabold uppercase tracking-wider">
               <Crown className="w-3 h-3 fill-amber-400" />
               <span>Vídeo Exclusivo VIP • R$ {(video.premium_price || 19.90).toFixed(2).replace('.', ',')}</span>
@@ -454,7 +454,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           )}
 
           {/* Sound / Music track ticker */}
-          <div className="flex items-center gap-2 text-[11px] text-zinc-300 pt-1">
+          <div className={`${expandDesc ? "flex" : "hidden sm:flex"} items-center gap-2 text-[11px] text-zinc-300 pt-1`}>
             <span className="animate-spin text-xs">💿</span>
             <span className="truncate">Som Original • {video.creator?.display_name || 'Velvet Records'}</span>
           </div>
