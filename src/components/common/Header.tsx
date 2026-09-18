@@ -38,7 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAuthModal,
   onOpenLgpdModal
 }) => {
-  const { currentUser, switchUserRole } = useAuth();
+  const { currentUser, switchUserRole, isAuthenticated } = useAuth();
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
 
   const tabs: { id: FeedTab; label: string; vip?: boolean }[] = [
@@ -136,7 +136,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           {/* Auth / Login Modal trigger */}
-          {onOpenAuthModal && (
+          {!isAuthenticated && onOpenAuthModal && (
             <button
               id="header-auth-btn"
               onClick={onOpenAuthModal}
@@ -160,7 +160,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {/* Role Switcher Dropdown (Allows testing as User, Creator, or Admin) */}
-          <div className="relative">
+          {isAuthenticated && <div className="relative">
             <button
               id="header-role-switcher-btn"
               onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
@@ -249,7 +249,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               </div>
             )}
-          </div>
+          </div>}
         </div>
       </div>
 
