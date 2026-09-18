@@ -43,7 +43,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenLgpd,
   onOpenAuth,
 }) => {
-  const { currentUser, currentCreator, updateProfile } = useAuth();
+  const { currentUser, currentCreator, isAuthenticated, updateProfile } = useAuth();
   const [creator, setCreator] = useState<Creator | undefined>(undefined);
   const [videos, setVideos] = useState<Video[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'free' | 'vip' | 'long' | 'favorites'>('all');
@@ -53,7 +53,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [nameInput, setNameInput] = useState('');
   const [bioInput, setBioInput] = useState('');
 
-  const isOwnProfile = !creatorId || (currentCreator && currentCreator.id === creatorId) || (creator && creator.user_id === currentUser.id);
+  const isOwnProfile = isAuthenticated && (!creatorId || (currentCreator && currentCreator.id === creatorId) || (creator && creator.user_id === currentUser.id));
 
   useEffect(() => {
     let targetCreator: Creator | undefined;
@@ -167,7 +167,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <div className="flex items-center gap-2 flex-wrap">
             {isOwnProfile ? (
               <>
-                {currentUser.role === 'creator' && (
+                {currentUser.role === 'creator' && currentCreator?.is_approved === true && (
                   <button
                     onClick={onOpenCreatorStudio}
                     className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-rose-950/40 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
@@ -198,13 +198,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <span className="ml-auto text-zinc-500 text-lg">›</span>
                 </button>
 
-                <button
-                  onClick={onOpenUpload}
-                  className="px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Postar Vídeo</span>
-                </button>
+                {(currentUser.role === 'admin' || (currentUser.role === 'creator' && currentCreator?.is_approved === true)) && (
+                  <button
+                    onClick={onOpenUpload}
+                    className="px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Postar Vídeo</span>
+                  </button>
+                )}
 
                 {onOpenLgpd && (
                   <button
