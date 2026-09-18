@@ -8,6 +8,10 @@ Deno.serve(async (req) => {
   if (!supabaseUrl || !serviceKey || !mpToken || !appUrl) return json({ error: 'Server is not configured' }, 500);
   const auth = req.headers.get('Authorization'); if (!auth?.startsWith('Bearer ')) return json({ error: 'Authentication required' }, 401);
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } }); const { data: { user }, error: userError } = await admin.auth.getUser(auth.slice(7)); if (userError || !user) return json({ error: 'Invalid session' }, 401);
+  const limited = await admin.rpc('consume_rate_limit', { p_bucket: 'payment_preference', p_subject: user.id, p_limit: 10, p_window_seconds: 60 });
+  if (limited.error || limited.data !== true) return json({ error: 'Too many requests' }, 429);
+  const restriction = await admin.from('account_restrictions').select('id').eq('subject_user_id', user.id).eq('is_active', true).in('scope', ['account','purchase']).lte('starts_at', new Date().toISOString()).or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`).limit(1);
+  if (restriction.data?.length) return json({ error: 'Account restricted' }, 403);
   const body = await req.json().catch(() => null), type = body?.type, itemId = body?.item_id;
   if (!['subscription', 'purchase', 'wallet_deposit'].includes(type) || typeof itemId !== 'string') return json({ error: 'Invalid payment request' }, 400);
   let title = '', amount = 0; const reference = `${type}:${itemId}:${user.id}:${crypto.randomUUID()}`;
