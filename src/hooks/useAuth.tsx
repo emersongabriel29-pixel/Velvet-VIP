@@ -9,7 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAgeVerified: boolean;
   hasConsented18Plus: boolean;
-  confirmAgeVerification: (birthDate?: string) => Promise<void>;
+  confirmAgeVerification: () => Promise<void>;
   login: (email: string, pass: string) => Promise<boolean>;
   requestPasswordReset: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(true);
     const { data: creator } = await supabase.from('creators').select('*').eq('user_id', userId).maybeSingle();
     setCurrentCreator(creator || undefined);
-    setHasConsented18Plus(Boolean(data.age_verified) && localStorage.getItem(AGE_CONSENT_KEY) === 'true');
+    setHasConsented18Plus(localStorage.getItem(AGE_CONSENT_KEY) === 'true');
     return mapped;
   };
 
@@ -100,19 +100,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => { mounted = false; listener.subscription.unsubscribe(); };
   }, [demoMode]);
 
-  const confirmAgeVerification = async (birthDate?: string) => {
+  const confirmAgeVerification = async () => {
+    // This is only an 18+ visitor declaration stored on this device.
+    // It must never mutate the server-side age_verified/KYC state.
     localStorage.setItem(AGE_CONSENT_KEY, 'true');
     setHasConsented18Plus(true);
-    if (demoMode) {
-      if (currentUser.id) dbService.updateUser(currentUser.id, birthDate ? { birth_date: birthDate, age_verified: true } : { age_verified: true });
-      return;
-    }
-    if (!supabase || !currentUser.id) return;
-    const patch: Record<string, unknown> = { age_verified: true };
-    if (birthDate) patch.birth_date = birthDate;
-    const { error } = await supabase.from('profiles').update(patch).eq('id', currentUser.id);
-    if (error) throw error;
-    await loadSupabaseProfile(currentUser.id, currentUser.email);
   };
 
   const login = async (email: string, pass: string): Promise<boolean> => {
