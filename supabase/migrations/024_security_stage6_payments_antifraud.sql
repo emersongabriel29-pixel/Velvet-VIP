@@ -1,4 +1,4 @@
--- Security stage 6: payment integrity and antifraud primitives.
+-- Security stage 6: provider-neutral payment integrity and antifraud primitives.
 alter table public.wallet_ledger add column if not exists provider text;
 create unique index if not exists wallet_ledger_provider_reference_unique
 on public.wallet_ledger(provider,reference_id,entry_type) where provider is not null and reference_id is not null;
@@ -25,3 +25,17 @@ begin
  return eid;
 end $$;
 revoke all on function public.record_payment_security_event(uuid,text,text,text,jsonb) from public,anon,authenticated;
+
+create table if not exists public.payment_provider_events(
+ id bigint generated always as identity primary key,
+ provider text not null,
+ external_event_id text not null,
+ event_type text,
+ payment_reference text,
+ payload_hash text,
+ received_at timestamptz not null default now(),
+ processed_at timestamptz,
+ unique(provider,external_event_id)
+);
+alter table public.payment_provider_events enable row level security;
+create policy "admins read provider payment events" on public.payment_provider_events for select to authenticated using(public.is_admin());
