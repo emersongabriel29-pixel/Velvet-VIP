@@ -7,15 +7,17 @@ interface BottomNavProps {
   activeView: string;
   onViewChange: (view: string) => void;
   onOpenUploadModal: () => void;
+  onOpenAuthModal: () => void;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
   activeView,
   onViewChange,
   onOpenUploadModal,
+  onOpenAuthModal,
 }) => {
   const { currentUser, isAuthenticated } = useAuth();
-  const unreadCount = dbService.getNotifications().filter(n => !n.read).length;
+  const unreadCount = isAuthenticated ? dbService.getNotifications().filter(n => !n.read).length : 0;
 
   return (
     <nav
@@ -55,7 +57,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         <div className="flex-1 flex items-center justify-center">
           <button
             id="nav-btn-create"
-            onClick={() => isAuthenticated ? onOpenUploadModal() : onViewChange('profile')}
+            onClick={() => currentUser.role === 'creator' || currentUser.role === 'admin' ? onOpenUploadModal() : onOpenAuthModal()}
             title="Publicar Vídeo Vertical"
             className="w-11 h-9 rounded-xl bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-rose-950/60 active:scale-95 transition-all cursor-pointer hover:brightness-110"
           >
@@ -66,7 +68,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         {/* Atividade (Notificações) */}
         <button
           id="nav-btn-activity"
-          onClick={() => onViewChange(isAuthenticated ? 'activity' : 'profile')}
+          onClick={() => isAuthenticated ? onViewChange('activity') : onOpenAuthModal()}
           className={`relative flex flex-col items-center justify-center flex-1 py-1 gap-1 transition-colors cursor-pointer ${
             activeView === 'activity' ? 'text-white' : 'text-zinc-400 hover:text-zinc-200'
           }`}
