@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Video } from '../../types';
 import { dbService } from '../../services/db';
+import { getPlayableVideoUrl } from '../../services/media';
 
 interface VideoCardProps {
   video: Video;
@@ -51,6 +52,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [hasFavorited, setHasFavorited] = useState(Boolean(video.has_favorited));
   const [showHeartBurst, setShowHeartBurst] = useState(false);
   const [expandDesc, setExpandDesc] = useState(false);
+  const [playbackUrl, setPlaybackUrl] = useState(video.video_url.startsWith('storage://') ? '' : video.video_url);
   const lastTapRef = useRef<number>(0);
 
   useEffect(() => {
@@ -64,6 +66,15 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     setHasLiked(Boolean(video.has_liked));
     setHasFavorited(Boolean(video.has_favorited));
   }, [video.likes_count, video.has_liked, video.has_favorited]);
+
+  useEffect(() => {
+    let cancelled=false;
+    setPlaybackUrl(video.video_url.startsWith('storage://') ? '' : video.video_url);
+    if (video.video_url.startsWith('storage://') && video.has_unlocked) {
+      getPlayableVideoUrl(video.id).then(url=>{if(!cancelled)setPlaybackUrl(url);}).catch(()=>{if(!cancelled)setPlaybackUrl('');});
+    }
+    return ()=>{cancelled=true;};
+  }, [video.id, video.video_url, video.has_unlocked]);
 
   // Handle Play/Pause when card becomes active/inactive
   useEffect(() => {
@@ -174,7 +185,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       >
         <video
           ref={videoRef}
-          src={video.video_url}
+          src={playbackUrl || undefined}
           poster={video.thumbnail_url}
           loop
           playsInline
