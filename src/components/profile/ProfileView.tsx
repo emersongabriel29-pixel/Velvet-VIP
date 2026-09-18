@@ -86,8 +86,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setCreator(dbService.getCreatorById(creator.id));
   };
 
-  const handleSaveProfile = () => {
-    updateProfile({ name: nameInput, bio: bioInput });
+  const handleSaveProfile = async () => {
+    await updateProfile({ name: nameInput, bio: bioInput });
     setIsEditingBio(false);
   };
 
@@ -117,8 +117,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <div className="absolute top-4 right-4 flex items-center gap-2">
           {isOwnProfile ? (
             <button
-              onClick={() => setIsEditingBio(!isEditingBio)}
-              className="p-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-white hover:bg-black text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              type="button"
+              aria-expanded={isEditingBio}
+              aria-controls="profile-edit-panel"
+              onClick={() => setIsEditingBio(v => !v)}
+              className="relative z-20 touch-manipulation p-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-white hover:bg-black text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Settings className="w-4 h-4" />
               <span className="hidden sm:inline">Editar Perfil</span>
@@ -267,7 +270,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         {/* Bio */}
         {isEditingBio ? (
-          <div className="p-4 bg-zinc-900 rounded-2xl border border-zinc-800 space-y-3">
+          <div id="profile-edit-panel" className="scroll-mt-20 p-4 bg-zinc-900 rounded-2xl border border-zinc-800 space-y-3">
             <div>
               <label className="block text-xs font-semibold text-zinc-400 mb-1">Nome</label>
               <input
