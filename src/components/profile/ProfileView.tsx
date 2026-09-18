@@ -95,7 +95,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const displayedVideos = videos.filter((v) => {
     if (activeTab === 'free') return !v.is_premium;
     if (activeTab === 'vip') return v.is_premium;
-    if (activeTab === 'long') return v.duration_seconds >= 60;
+    if (activeTab === 'long') return v.content_kind === 'long' || v.duration_seconds >= 60;
     return true;
   });
 
@@ -335,7 +335,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       </div>
 
       {/* Profile Tabs */}
-      <div className="flex items-center gap-2 border-b border-zinc-800 pb-3 mb-4">
+      <div className="flex items-center gap-2 overflow-x-auto border-b border-zinc-800 pb-3 mb-4">
         <button
           onClick={() => setActiveTab('all')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
@@ -371,6 +371,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <Crown className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
           <span>Exclusivos VIP</span>
         </button>
+        <button
+          onClick={() => setActiveTab('long')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${activeTab === 'long' ? 'bg-rose-600 text-white' : 'text-zinc-400 hover:text-white'}`}
+        >
+          <Play className="w-3.5 h-3.5" />
+          <span>Vídeos longos</span>
+        </button>
       </div>
 
       {/* Videos Grid */}
@@ -386,7 +393,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <div
               key={v.id}
               onClick={() => onSelectVideo(v.id)}
-              className="group relative aspect-[9/16] rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-all cursor-pointer shadow-md"
+              className={`group relative ${v.content_kind === 'long' || v.duration_seconds >= 60 ? 'aspect-video col-span-2 sm:col-span-2' : 'aspect-[9/16]'} rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-all cursor-pointer shadow-md`}
             >
               <img
                 src={v.thumbnail_url}
