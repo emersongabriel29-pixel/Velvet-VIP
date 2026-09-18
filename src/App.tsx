@@ -63,7 +63,7 @@ const VelvetVipApp: React.FC = () => {
       {activeView === 'monetization' && <MonetizationPage onBack={() => setActiveView('feed')} />}
       {activeView === 'landing' && <LandingPage onEnterApp={() => setActiveView('feed')} onOpenUpload={() => setCreateHubOpen(true)} />}
     </main>
-    {activeView !== 'landing' && <BottomNav activeView={activeView} onViewChange={(view) => view === 'profile' ? handleOpenProfile() : setActiveView(view)} onOpenUploadModal={() => setCreateHubOpen(true)} />}
+    {activeView !== 'landing' && <BottomNav activeView={activeView} onViewChange={(view) => view === 'profile' ? handleOpenProfile() : setActiveView(view)} onOpenUploadModal={() => setCreateHubOpen(true)} onOpenAuthModal={() => setAuthModalOpen(true)} />}
     <CreateHub isOpen={createHubOpen} onClose={() => setCreateHubOpen(false)} onShortVideo={() => { setUploadMode('short'); setUploadModalOpen(true); }} onLongVideo={() => { setUploadMode('long'); setUploadModalOpen(true); }} onLive={() => setActiveView('live_studio')} />
     <UploadModal mode={uploadMode} isOpen={uploadModalOpen} onClose={() => setUploadModalOpen(false)} onSuccess={() => { setActiveView('feed'); setCurrentTab('foryou'); }} />
     <WalletModal isOpen={walletModalOpen} onClose={() => setWalletModalOpen(false)} />
