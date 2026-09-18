@@ -796,7 +796,7 @@ class DatabaseService {
         break;
       case 'foryou':
       default:
-        list = [...list].sort((a, b) => score(b) - score(a));
+        list = [...list].sort((a, b) => (Number(a.is_premium) - Number(b.is_premium)) || (score(b) - score(a)));
         break;
     }
 
