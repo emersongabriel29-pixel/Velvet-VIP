@@ -120,7 +120,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
           category,hashtags:tags,isPremium:accessType==='premium',
           premiumPrice:accessType==='premium'?premiumPrice:0,
           requiredTier:accessType==='premium'?requiredTier:'free',isDraft:asDraft,
-          contentKind:mode,durationSeconds
+          contentKind:mode as 'short' | 'long',durationSeconds
         });
         setUploadProgress(100);
       } else {
@@ -128,7 +128,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
           title:title.trim(),description:description.trim(),video_url:videoUrl,thumbnail_url:thumbnailUrl,
           category,hashtags:tags,is_premium:accessType==='premium',
           premium_price:accessType==='premium'?premiumPrice:0,
-          required_tier:accessType==='premium'?requiredTier:'free',is_draft:asDraft,content_kind:mode
+          required_tier:accessType==='premium'?requiredTier:'free',is_draft:asDraft,content_kind:mode as 'short' | 'long'
         });
         setUploadProgress(100);
       }
