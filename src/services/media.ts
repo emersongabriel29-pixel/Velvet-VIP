@@ -61,3 +61,28 @@ export async function getPlayableVideoUrl(videoId:string):Promise<string>{
   if(error||!data?.url) throw new Error(data?.error||error?.message||'Não foi possível liberar o vídeo.');
   return data.url;
 }
+
+
+const IMAGE_MIME = new Set(['image/jpeg','image/png','image/webp']);
+const MAX_PROFILE_IMAGE_BYTES = 8 * 1024 * 1024;
+
+export async function uploadProfileImage(file:File, kind:'avatar'|'cover'):Promise<string>{
+  if (!isSupabaseConfigured || !supabase) throw new Error('Supabase não configurado.');
+  if (!IMAGE_MIME.has(file.type)) throw new Error('Use uma imagem JPG, PNG ou WEBP.');
+  if (file.size<=0 || file.size>MAX_PROFILE_IMAGE_BYTES) throw new Error('A imagem deve ter até 8 MB.');
+  const {data:{user},error}=await supabase.auth.getUser();
+  if(error||!user) throw new Error('Faça login novamente.');
+  const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const path=`${user.id}/profile/${kind}-${crypto.randomUUID()}.${ext}`;
+  const uploaded=await supabase.storage.from('velvet-media').upload(path,file,{contentType:file.type,cacheControl:'3600',upsert:false});
+  if(uploaded.error) throw new Error(`Falha ao enviar imagem: ${uploaded.error.message}`);
+  return `storage://${path}`;
+}
+
+export async function getProfileImageUrl(ref:string):Promise<string>{
+  if(!ref?.startsWith('storage://')) return ref || '';
+  if(!supabase) return '';
+  const path=ref.slice('storage://'.length);
+  const {data,error}=await supabase.storage.from('velvet-media').createSignedUrl(path,3600);
+  return error ? '' : data.signedUrl;
+}
