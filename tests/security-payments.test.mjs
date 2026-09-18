@@ -8,3 +8,5 @@ test('ledger has provider reference idempotency primitive',()=>{assert.match(sql
 test('payment endpoint CORS is allowlisted and no-store',()=>{assert.match(create,/ALLOWED_ORIGINS/);assert.match(create,/Cache-Control':'no-store'/);assert.doesNotMatch(create,/Access-Control-Allow-Origin': '\*'/);});
 
 test('provider events are normalized and idempotent',()=>{assert.match(sql,/payment_provider_events/);assert.match(sql,/unique\(provider,external_event_id\)/);});
+
+// CI trigger: provider-neutral antifraud revision validated through PR checks.
