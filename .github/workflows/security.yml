@@ -13,12 +13,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
         with:
-          bun-version: latest
-      - run: bun install --frozen-lockfile
-      - name: Dependency audit (informational until qs remediation)
-        run: bun audit
-        continue-on-error: true
-      - run: bun run typecheck
-      - run: bun run build
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Reject committed secrets
+        shell: bash
+        run: |
+          if git grep -nE '(service_role|SUPABASE_SERVICE_ROLE_KEY|sk_live_|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' -- ':!package-lock.json' ':!SECURITY*'; then
+            echo 'Potential secret committed to repository'; exit 1
+          fi
