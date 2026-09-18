@@ -150,7 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (error) throw error;
     localStorage.setItem(AGE_CONSENT_KEY, 'true');
     setHasConsented18Plus(true);
-    if (!data.user) return null;
+    if (!data.user || !data.session) return null;
     return await loadSupabaseProfile(data.user.id, data.user.email || email);
   };
 
