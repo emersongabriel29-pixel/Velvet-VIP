@@ -8,6 +8,9 @@ Deno.serve(async (req) => {
   if (!secret || !supabaseUrl || !serviceKey || !mpToken) return new Response('Server not configured', { status: 500 });
   const signature = req.headers.get('x-signature') || '', requestId = req.headers.get('x-request-id') || '', url = new URL(req.url), dataId = url.searchParams.get('data.id') || '';
   const parts = Object.fromEntries(signature.split(',').map(p => p.split('=', 2).map(s => s.trim())).filter(p => p.length === 2));
+  const ts = Number(parts.ts || 0);
+  const now = Math.floor(Date.now() / 1000);
+  if (!Number.isFinite(ts) || Math.abs(now - ts) > 300) return new Response('Stale signature', { status: 401 });
   const manifestParts = [`id:${dataId}`]; if (requestId) manifestParts.push(`request-id:${requestId}`); if (parts.ts) manifestParts.push(`ts:${parts.ts}`);
   const expected = await hmac(secret, `${manifestParts.join(';')};`); if (!parts.v1 || !timingSafeEqual(expected, parts.v1)) return new Response('Invalid signature', { status: 401 });
   const body = await req.json().catch(() => ({})), eventId = String(body.id || dataId || crypto.randomUUID());
