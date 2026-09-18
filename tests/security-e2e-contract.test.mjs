@@ -10,9 +10,9 @@ const stage7=read('supabase/migrations/025_security_stage7_observability.sql');
 const webhook=read('supabase/functions/mercadopago-webhook/index.ts');
 
 test('E2E contract: restricted accounts cannot publish/message/purchase',()=>{
- assert.match(stage2,/assert_not_restricted\('publish'\)/);
- assert.match(stage2,/assert_not_restricted\('message'\)/);
- assert.match(stage2,/assert_not_restricted\('purchase'\)/);
+ assert.match(stage2,/has_active_restriction\('publish'\)/);
+ assert.match(stage2,/has_active_restriction\('message'\)/);
+ assert.match(stage2,/has_active_restriction\('purchase'\)/);
 });
 test('E2E contract: private media requires owner-scoped storage path',()=>{
  assert.match(stage3,/velvet-media/);assert.match(stage3,/auth\.uid\(\)/);assert.match(stage3,/storage\.foldername/);
