@@ -14,7 +14,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   onViewChange,
   onOpenUploadModal,
 }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, isAuthenticated } = useAuth();
   const unreadCount = dbService.getNotifications().filter(n => !n.read).length;
 
   return (
@@ -55,7 +55,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         <div className="flex-1 flex items-center justify-center">
           <button
             id="nav-btn-create"
-            onClick={onOpenUploadModal}
+            onClick={() => isAuthenticated ? onOpenUploadModal() : onViewChange('profile')}
             title="Publicar Vídeo Vertical"
             className="w-11 h-9 rounded-xl bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-rose-950/60 active:scale-95 transition-all cursor-pointer hover:brightness-110"
           >
@@ -66,7 +66,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         {/* Atividade (Notificações) */}
         <button
           id="nav-btn-activity"
-          onClick={() => onViewChange('activity')}
+          onClick={() => onViewChange(isAuthenticated ? 'activity' : 'profile')}
           className={`relative flex flex-col items-center justify-center flex-1 py-1 gap-1 transition-colors cursor-pointer ${
             activeView === 'activity' ? 'text-white' : 'text-zinc-400 hover:text-zinc-200'
           }`}
@@ -99,11 +99,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             )}
           </div>
           <span className={`text-[10px] ${activeView === 'profile' || activeView === 'creator_studio' ? 'font-bold text-white' : 'font-medium'}`}>
-            Perfil
+            {isAuthenticated ? 'Perfil' : 'Entrar'}
           </span>
         </button>
-
-        <button id="nav-btn-more" onClick={() => onViewChange('more')} className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 transition-colors ${activeView === 'more' || activeView === 'product_tool' ? 'text-white' : 'text-zinc-400'}`}><Grid2X2 className={`w-5 h-5 ${activeView === 'more' || activeView === 'product_tool' ? 'text-rose-500' : ''}`}/><span className="text-[10px] font-medium">Mais</span></button>
 
         {/* Admin Tab (If role === 'admin') */}
         {currentUser.role === 'admin' && (
