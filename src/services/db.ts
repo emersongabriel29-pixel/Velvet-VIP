@@ -1547,6 +1547,13 @@ class DatabaseService {
     this.currentUserId = 'user-001';
     this.notify();
   }
+  async hasRestriction(scope: 'account'|'publish'|'live'|'comment'|'message'|'purchase'|'monetization'|'withdrawal'): Promise<boolean> {
+    if (!supabase || !isSupabaseConfigured) return false;
+    const { data, error } = await supabase.rpc('has_active_restriction', { p_scope: scope });
+    if (error) throw error;
+    return Boolean(data);
+  }
+
 }
 
 export const dbService = new DatabaseService();
