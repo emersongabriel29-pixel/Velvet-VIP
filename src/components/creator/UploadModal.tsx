@@ -227,7 +227,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
                 >
                   <Upload className="w-6 h-6 text-zinc-400 group-hover:text-rose-500 transition-colors" />
                   <span className="text-xs font-bold text-white">Carregar Arquivo do Dispositivo</span>
-                  <span className="text-[10px] text-zinc-500">Suporta MP4, WEBM ou MOV vertical</span>
+                  <span className="text-[10px] text-zinc-500">{mode === 'long' ? 'MP4, WEBM ou MOV • horizontal recomendado (16:9)' : 'MP4, WEBM ou MOV • vertical recomendado (9:16)'}</span>
                 </button>
 
                 <div className="space-y-1.5 pt-1">
