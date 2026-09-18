@@ -3,6 +3,7 @@ import { X, Send, Heart, MessageSquare } from 'lucide-react';
 import { Comment } from '../../types';
 import { dbService } from '../../services/db';
 import { useAuth } from '../../hooks/useAuth';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface CommentsModalProps {
   videoId: string;
@@ -17,7 +18,8 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, isAuthenticated } = useAuth();
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [comments, setComments] = useState<Comment[]>([]);
   const [inputContent, setInputContent] = useState('');
 
@@ -26,6 +28,19 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
       setComments(dbService.getComments(videoId));
     }
   }, [isOpen, videoId]);
+
+  const handleLike = async (comment: Comment) => {
+    if (!isAuthenticated || !currentUser.id) return;
+    if (!isSupabaseConfigured || !supabase) return;
+    const liked = likedIds.has(comment.id);
+    setLikedIds(prev => { const n=new Set(prev); liked?n.delete(comment.id):n.add(comment.id); return n; });
+    setComments(prev => prev.map(x => x.id===comment.id ? {...x, likes_count: Math.max(0,(x.likes_count||0)+(liked?-1:1))} : x));
+    const { error } = await supabase.rpc('toggle_comment_like', { p_comment_id: comment.id });
+    if (error) {
+      setLikedIds(prev => { const n=new Set(prev); liked?n.add(comment.id):n.delete(comment.id); return n; });
+      setComments(prev => prev.map(x => x.id===comment.id ? {...x, likes_count: Math.max(0,(x.likes_count||0)+(liked?1:-1))} : x));
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -102,10 +117,12 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
                 </div>
 
                 <button
-                  className="p-1 text-zinc-500 hover:text-rose-500 flex flex-col items-center gap-0.5 cursor-pointer shrink-0"
-                  title="Curtir comentário"
+                  onClick={() => handleLike(comment)}
+                  disabled={!isAuthenticated}
+                  className={`p-1 flex flex-col items-center gap-0.5 shrink-0 ${likedIds.has(comment.id) ? 'text-rose-500' : 'text-zinc-500 hover:text-rose-500'} ${isAuthenticated ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+                  title={isAuthenticated ? "Curtir comentário" : "Entre para curtir"}
                 >
-                  <Heart className="w-3.5 h-3.5" />
+                  <Heart className={`w-3.5 h-3.5 ${likedIds.has(comment.id) ? 'fill-current' : ''}`} />
                   <span className="text-[10px]">{comment.likes_count > 0 ? comment.likes_count : ''}</span>
                 </button>
               </div>
