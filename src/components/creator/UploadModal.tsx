@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, Film, CheckCircle2, Sparkles, Image, Lock, Globe, Users } from 'lucide-react';
 import { dbService } from '../../services/db';
+import { isSupabaseConfigured } from '../../lib/supabase';
+import { uploadCreatorVideo } from '../../services/media';
 
 interface UploadModalProps {
   mode?: 'short' | 'long';
@@ -48,6 +50,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [thumbnailBlob, setThumbnailBlob] = useState<Blob | null>(null);
+  const [durationSeconds, setDurationSeconds] = useState(1);
+  const [uploadError, setUploadError] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
@@ -60,6 +66,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!['video/mp4','video/webm','video/quicktime'].includes(file.type) || file.size > 512 * 1024 * 1024) {
+      setUploadError('Use MP4, WEBM ou MOV com até 512 MB.'); return;
+    }
+    setUploadError('');
+    setSelectedFile(file);
     const localUrl = URL.createObjectURL(file);
     setVideoUrl(localUrl);
 
@@ -71,7 +82,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
     tempVideo.currentTime = 1.0;
 
     tempVideo.onloadeddata = () => {
-      tempVideo.currentTime = 1.0;
+      setDurationSeconds(Number.isFinite(tempVideo.duration) ? tempVideo.duration : 1);
+      tempVideo.currentTime = Math.min(1.0, Math.max(0, (tempVideo.duration || 1) / 4));
     };
 
     tempVideo.onseeked = () => {
@@ -84,6 +96,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
           ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
           const thumb = canvas.toDataURL('image/jpeg', 0.85);
           setThumbnailUrl(thumb);
+          canvas.toBlob(blob => setThumbnailBlob(blob), 'image/jpeg', 0.85);
         }
       } catch (err) {
         console.warn('Could not extract canvas frame, using default thumb', err);
@@ -91,55 +104,41 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
     };
   };
 
-  const handleSubmit = (asDraft: boolean) => {
+  const handleSubmit = async (asDraft: boolean) => {
     if (!title.trim()) return;
-
+    setUploadError('');
     setIsDraft(asDraft);
     setIsUploading(true);
-    setUploadProgress(15);
-
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(interval);
-          return 95;
-        }
-        return prev + 25;
-      });
-    }, 200);
-
-    setTimeout(() => {
-      clearInterval(interval);
-      setUploadProgress(100);
-
-      const tags = hashtagsStr
-        .split(/[,\s#]+/)
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean);
-
-      dbService.uploadVideo({
-        title: title.trim(),
-        description: description.trim(),
-        video_url: videoUrl,
-        thumbnail_url: thumbnailUrl,
-        category,
-        hashtags: tags,
-        is_premium: accessType === 'premium',
-        premium_price: accessType === 'premium' ? premiumPrice : 0,
-        required_tier: accessType === 'premium' ? requiredTier : 'free',
-        is_draft: asDraft,
-        content_kind: mode as 'short' | 'long',
-      });
-
-      setIsUploading(false);
+    setUploadProgress(10);
+    const tags = hashtagsStr.split(/[,\s#]+/).map(t=>t.trim().toLowerCase()).filter(Boolean);
+    try {
+      if (isSupabaseConfigured) {
+        if (!selectedFile) throw new Error('Selecione um arquivo do dispositivo para publicar em produção.');
+        setUploadProgress(30);
+        await uploadCreatorVideo({
+          file:selectedFile,thumbnail:thumbnailBlob,title:title.trim(),description:description.trim(),
+          category,hashtags:tags,isPremium:accessType==='premium',
+          premiumPrice:accessType==='premium'?premiumPrice:0,
+          requiredTier:accessType==='premium'?requiredTier:'free',isDraft:asDraft,
+          contentKind:mode,durationSeconds
+        });
+        setUploadProgress(100);
+      } else {
+        dbService.uploadVideo({
+          title:title.trim(),description:description.trim(),video_url:videoUrl,thumbnail_url:thumbnailUrl,
+          category,hashtags:tags,is_premium:accessType==='premium',
+          premium_price:accessType==='premium'?premiumPrice:0,
+          required_tier:accessType==='premium'?requiredTier:'free',is_draft:asDraft,content_kind:mode
+        });
+        setUploadProgress(100);
+      }
       setUploadSuccess(true);
-
-      setTimeout(() => {
-        setUploadSuccess(false);
-        onClose();
-        if (onSuccess) onSuccess();
-      }, 1500);
-    }, 1200);
+      setTimeout(()=>{setUploadSuccess(false);onClose();onSuccess?.();},900);
+    } catch (err:any) {
+      setUploadError(err?.message || 'Falha ao publicar o vídeo.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -159,6 +158,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
           </button>
         </div>
 
+        {uploadError && <div role="alert" className="mx-5 mt-4 rounded-xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-200">{uploadError}</div>}
         {uploadSuccess ? (
           <div className="py-16 text-center space-y-3">
             <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto animate-bounce" />
@@ -174,14 +174,14 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
             <div className="w-14 h-14 rounded-full bg-rose-950/60 border border-rose-500/40 flex items-center justify-center mx-auto animate-pulse">
               <Upload className="w-7 h-7 text-rose-500" />
             </div>
-            <h4 className="text-base font-bold text-white">{mode === 'long' ? 'Processando e codificando vídeo longo...' : 'Processando e codificando vídeo vertical...'}</h4>
+            <h4 className="text-base font-bold text-white">{isSupabaseConfigured ? 'Enviando vídeo com segurança...' : (mode === 'long' ? 'Preparando vídeo longo...' : 'Preparando vídeo vertical...')}</h4>
             <div className="max-w-md mx-auto w-full bg-zinc-800 rounded-full h-3 overflow-hidden">
               <div
                 className="bg-gradient-to-r from-rose-600 to-amber-500 h-full transition-all duration-300"
                 style={{ width: `${uploadProgress}%` }}
               />
             </div>
-            <p className="text-xs text-zinc-400">{uploadProgress}% concluído • Gerando thumbnail e streams</p>
+            <p className="text-xs text-zinc-400">{uploadProgress}% concluído • Upload privado</p>
           </div>
         ) : (
           <div className="p-5 overflow-y-auto space-y-5 flex-1">
