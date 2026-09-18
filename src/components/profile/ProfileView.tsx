@@ -187,10 +187,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
                 <button
                   onClick={onOpenWallet}
-                  className="px-3.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="basis-full w-full px-4 py-3 rounded-2xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-left flex items-center gap-3 transition-colors cursor-pointer"
+                  title="Minha Carteira"
                 >
-                  <Wallet className="w-4 h-4 text-emerald-400" />
-                  <span>R$ {currentUser.wallet_balance.toFixed(2).replace('.', ',')}</span>
+                  <Wallet className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span className="flex flex-col leading-tight">
+                    <span className="text-[11px] font-medium text-zinc-400">Minha Carteira</span>
+                    <span className="text-sm font-bold text-amber-400">R$ {currentUser.wallet_balance.toFixed(2).replace('.', ',')}</span>
+                  </span>
+                  <span className="ml-auto text-zinc-500 text-lg">›</span>
                 </button>
 
                 <button
