@@ -128,7 +128,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
         premium_price: accessType === 'premium' ? premiumPrice : 0,
         required_tier: accessType === 'premium' ? requiredTier : 'free',
         is_draft: asDraft,
-        content_kind: mode,
+        content_kind: mode as 'short' | 'long',
       });
 
       setIsUploading(false);
