@@ -27,7 +27,7 @@ export const AuthModalV2: React.FC<AuthModalProps> = ({ isOpen, onClose, onOpenT
     if (password.length < 8) return setError('Use uma senha com pelo menos 8 caracteres.');
     if (password !== confirm) return setError('As senhas não coincidem.');
     setLoading(true);
-    try { const created = await register(name.trim(), username.trim(), email.trim(), birthDate, role, password); if (!created) { setSuccess('Conta criada. Verifique seu e-mail para confirmar o acesso.'); } else { setSuccess('Conta criada com sucesso.'); } setTimeout(onClose, 900); }
+    try { const created = await register(name.trim(), username.trim(), email.trim(), birthDate, role, password); if (!created) { setSuccess('Conta criada. Confirme seu e-mail e depois entre com sua senha.'); setMode('login'); setPassword(''); setConfirm(''); } else { setSuccess('Conta criada e login efetuado com sucesso.'); setTimeout(onClose, 900); } }
     catch (err: any) { setError(err?.message || 'Não foi possível criar a conta.'); }
     finally { setLoading(false); }
   };
