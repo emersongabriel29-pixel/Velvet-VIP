@@ -23,9 +23,16 @@ Deno.serve(async (req) => {
   const reference = String(payment.external_reference || ''), [kind, itemId, userId] = reference.split(':'); if (!userId || !kind) return new Response('ok', { status: 200 });
   const status = payment.status === 'approved' ? 'paid' : payment.status === 'rejected' || payment.status === 'cancelled' ? 'failed' : 'pending';
   const { data: dbPayment } = await admin.from('payments').select('id,amount,status').eq('user_id', userId).eq('payment_gateway_id', reference).maybeSingle(); if (!dbPayment) return new Response('Payment record not found', { status: 404 });
+  const providerAmount = Number(payment.transaction_amount);
+  const expectedAmount = Number(dbPayment.amount);
+  const currency = String(payment.currency_id || '');
+  if (!Number.isFinite(providerAmount) || Math.abs(providerAmount - expectedAmount) > 0.001 || currency !== 'BRL') {
+    await admin.rpc('record_payment_security_event', { p_payment_id: dbPayment.id, p_provider: 'mercadopago', p_provider_payment_id: String(payment.id || dataId), p_reason: 'amount_or_currency_mismatch', p_metadata: { expected_amount: expectedAmount, received_amount: providerAmount, currency } });
+    return new Response('Payment integrity check failed', { status: 409 });
+  }
   await admin.from('payments').update({ status }).eq('id', dbPayment.id);
   if (status === 'paid' && dbPayment.status !== 'paid') {
-    const amount = Number(payment.transaction_amount || dbPayment.amount || 0);
+    const amount = providerAmount;
     if (kind === 'purchase') {
       const { data: video } = await admin.from('videos').select('creator_id').eq('id', itemId).single();
       if (video) { await admin.from('purchases').upsert({ user_id: userId, video_id: itemId, creator_id: video.creator_id, amount, payment_method: 'pix', status: 'completed' }, { onConflict: 'user_id,video_id' }); await admin.rpc('credit_creator', { p_creator_id: video.creator_id, p_gross: amount, p_reference_id: String(payment.id), p_metadata: { provider: 'mercadopago', payment_id: String(payment.id) } }); }
