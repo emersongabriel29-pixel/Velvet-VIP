@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Notification } from '../../types';
 import { dbService } from '../../services/db';
+import { useAuth } from '../../hooks/useAuth';
 
 interface NotificationsPageProps {
   onSelectVideo?: (videoId: string) => void;
@@ -21,11 +22,12 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
   onSelectVideo,
   onSelectCreator,
 }) => {
+  const { isAuthenticated } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<'all' | 'interactions' | 'monetization'>('all');
 
   const loadNotifications = () => {
-    setNotifications(dbService.getNotifications());
+    setNotifications(isAuthenticated ? dbService.getNotifications() : []);
   };
 
   useEffect(() => {
@@ -39,9 +41,10 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
       window.removeEventListener('focus', refresh);
       window.removeEventListener('storage', refresh);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   const handleMarkAllRead = () => {
+    if (!isAuthenticated) return;
     dbService.markAllNotificationsAsRead();
     loadNotifications();
   };
@@ -81,19 +84,20 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
       <div className="flex items-start justify-between gap-3 pb-3 border-b border-zinc-800 mb-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white font-display">Atividade & Notificações</h1>
-          <p className="text-xs text-zinc-400">Acompanhe quem interagiu com seus vídeos e novas compras.</p>
+          <p className="text-xs text-zinc-400">{isAuthenticated ? 'Interações da sua conta e recomendações para descobrir novos conteúdos.' : 'Descubra conteúdos novos e criadores que você poderá seguir ao criar sua conta.'}</p>
         </div>
 
-        <button
+        {isAuthenticated && <button
           onClick={handleMarkAllRead}
           className="shrink-0 px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
         >
           <CheckCheck className="w-3.5 h-3.5 text-zinc-400" />
           <span className="hidden sm:inline">Marcar todas como lidas</span><span className="sm:hidden">Ler todas</span>
-        </button>
+        </button>}
       </div>
 
       {/* Filter Tabs */}
+      {isAuthenticated ? (
       <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1">
         <button
           onClick={() => setFilter('all')}
@@ -128,10 +132,30 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
           Monetização
         </button>
       </div>
+      ) : (
+        <div className="mb-4 flex gap-2">
+          <span className="rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-bold text-white">Para você</span>
+          <span className="rounded-xl bg-zinc-900 px-3.5 py-1.5 text-xs font-bold text-zinc-400">Novidades</span>
+        </div>
+      )}
 
       {/* Notifications List */}
+      {!isAuthenticated && (
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <button onClick={() => onSelectCreator?.('creator-001')} className="rounded-2xl border border-rose-500/20 bg-rose-950/10 p-4 text-left hover:border-rose-500/50">
+            <Crown className="mb-3 h-5 w-5 text-amber-400" />
+            <p className="text-sm font-bold text-white">Criadores para conhecer</p>
+            <p className="mt-1 text-xs text-zinc-400">Explore perfis em destaque. Crie uma conta para seguir seus favoritos.</p>
+          </button>
+          <button onClick={() => onSelectVideo?.('video-001')} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 text-left hover:border-rose-500/40">
+            <Bell className="mb-3 h-5 w-5 text-rose-400" />
+            <p className="text-sm font-bold text-white">Novos conteúdos</p>
+            <p className="mt-1 text-xs text-zinc-400">Veja lançamentos gratuitos e descubra novos criadores.</p>
+          </button>
+        </div>
+      )}
       <div className="space-y-2">
-        {filtered.length === 0 ? (
+        {!isAuthenticated ? null : filtered.length === 0 ? (
           <div className="py-16 text-center text-zinc-500">
             <Bell className="w-12 h-12 mx-auto mb-2 opacity-30 stroke-[1.5]" />
             <p className="text-sm font-semibold text-zinc-400">Nenhuma notificação por enquanto</p>
