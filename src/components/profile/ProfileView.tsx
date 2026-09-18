@@ -18,7 +18,8 @@ import {
   LogIn,
   Camera,
   Share2,
-  Radio
+  Radio,
+  ArrowLeft
 } from 'lucide-react';
 import { Creator, Video } from '../../types';
 import { dbService } from '../../services/db';
@@ -150,6 +151,33 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     return true;
   });
 
+  if (isOwnProfile && isEditingBio) {
+    return (
+      <div id="profile-settings-screen" className="min-h-screen bg-[#09090b] text-white pt-16 pb-24">
+        <div className="mx-auto max-w-2xl px-4 sm:px-6">
+          <div className="mb-6 flex items-center gap-3 border-b border-zinc-800 pb-5">
+            <button type="button" onClick={()=>setIsEditingBio(false)} className="touch-manipulation rounded-xl border border-zinc-800 bg-zinc-900 p-2.5 text-zinc-300 hover:text-white" aria-label="Voltar ao perfil"><ArrowLeft className="h-5 w-5"/></button>
+            <div><p className="text-[11px] font-bold uppercase tracking-[.2em] text-rose-400">Configurações</p><h1 className="text-xl font-black sm:text-2xl">Editar perfil</h1></div>
+          </div>
+          <div className="space-y-5 rounded-3xl border border-zinc-800 bg-zinc-900/60 p-4 sm:p-6">
+            {profileError && <p role="alert" className="rounded-xl border border-rose-500/30 bg-rose-950/20 p-3 text-xs text-rose-300">{profileError}</p>}
+            <div className="relative h-36 overflow-hidden rounded-2xl bg-gradient-to-r from-rose-950/60 via-zinc-900 to-amber-950/40 border border-zinc-800">
+              {coverPreview && <img src={coverPreview} alt="Prévia da capa" className="h-full w-full object-cover opacity-70"/>}
+              <label className="absolute bottom-3 right-3 cursor-pointer rounded-xl bg-black/70 px-3 py-2 text-xs font-bold"><Camera className="mr-1.5 inline h-4 w-4"/>Alterar capa<input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e=>pickImage(e.target.files?.[0],'cover')}/></label>
+            </div>
+            <div className="flex items-center gap-4">
+              <img src={avatarPreview || creator?.avatar_url || currentUser.avatar_url || 'https://placehold.co/256x256?text=Foto'} alt="Foto do perfil" className="h-24 w-24 rounded-3xl border-2 border-zinc-700 object-cover"/>
+              <div><label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold"><Camera className="h-4 w-4"/>Alterar foto<input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e=>pickImage(e.target.files?.[0],'avatar')}/></label><p className="mt-2 text-[11px] text-zinc-500">Foto obrigatória • JPG, PNG ou WEBP • até 8 MB</p></div>
+            </div>
+            <div><label className="mb-1.5 block text-xs font-semibold text-zinc-400">Nome</label><input type="text" value={nameInput} onChange={e=>setNameInput(e.target.value)} className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-white outline-none focus:border-rose-500"/></div>
+            <div><label className="mb-1.5 block text-xs font-semibold text-zinc-400">Biografia</label><textarea rows={4} value={bioInput} onChange={e=>setBioInput(e.target.value)} className="w-full resize-none rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-white outline-none focus:border-rose-500"/></div>
+            <div className="flex gap-3 border-t border-zinc-800 pt-4"><button type="button" onClick={()=>setIsEditingBio(false)} className="flex-1 rounded-xl border border-zinc-700 px-4 py-3 text-sm font-bold text-zinc-300">Cancelar</button><button type="button" onClick={handleSaveProfile} disabled={savingProfile} className="flex-1 rounded-xl bg-rose-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{savingProfile?'Salvando...':'Salvar alterações'}</button></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#09090b] text-white pt-14 pb-20 max-w-4xl mx-auto px-3 sm:px-6">
       {/* Cover Banner */}
@@ -170,8 +198,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <button
               type="button"
               aria-expanded={isEditingBio}
-              aria-controls="profile-edit-panel"
-              onClick={() => setIsEditingBio(v => !v)}
+              aria-controls="profile-settings-screen"
+              onClick={() => setIsEditingBio(true)}
               className="relative z-20 touch-manipulation p-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-white hover:bg-black text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Settings className="w-4 h-4" />
@@ -321,49 +349,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
 
         {/* Bio */}
-        {isEditingBio ? (
-          <div id="profile-edit-panel" className="scroll-mt-20 p-4 bg-zinc-900 rounded-2xl border border-zinc-800 space-y-3">
-            {profileError && <p className="text-xs text-rose-400">{profileError}</p>}
-            <div className="grid sm:grid-cols-2 gap-3"><label className="rounded-xl border border-zinc-700 p-3 text-xs text-zinc-300 cursor-pointer"><Camera className="inline w-4 h-4 mr-2"/>Foto de perfil *<input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e=>pickImage(e.target.files?.[0],'avatar')} /></label><label className="rounded-xl border border-zinc-700 p-3 text-xs text-zinc-300 cursor-pointer"><Camera className="inline w-4 h-4 mr-2"/>Alterar capa (opcional)<input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e=>pickImage(e.target.files?.[0],'cover')} /></label></div><p className="text-[11px] text-zinc-500">A foto é obrigatória. A capa é opcional; sem capa, permanece o padrão Velvet.</p>
-            <div>
-              <label className="block text-xs font-semibold text-zinc-400 mb-1">Nome</label>
-              <input
-                type="text"
-                value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
-                className="w-full px-3 py-1.5 bg-[#141419] border border-zinc-700 rounded-lg text-xs text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-zinc-400 mb-1">Biografia</label>
-              <textarea
-                rows={2}
-                value={bioInput}
-                onChange={(e) => setBioInput(e.target.value)}
-                className="w-full px-3 py-1.5 bg-[#141419] border border-zinc-700 rounded-lg text-xs text-white resize-none"
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setIsEditingBio(false)}
-                className="px-3 py-1 text-xs text-zinc-400 hover:text-white"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSaveProfile}
-                disabled={savingProfile}
-                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-lg"
-              >
-                Salvar Alterações
-              </button>
-            </div>
-          </div>
-        ) : (
-          <p className="text-zinc-300 text-xs sm:text-sm leading-relaxed max-w-2xl">
-            {creator?.bio || currentUser.bio || 'Criador exclusivo na plataforma Velvet VIP.'}
-          </p>
-        )}
+        <p className="text-zinc-300 text-xs sm:text-sm leading-relaxed max-w-2xl">
+          {creator?.bio || currentUser.bio || 'Criador exclusivo na plataforma Velvet VIP.'}
+        </p>
 
         {/* Statistics Bar */}
         <div className="flex items-center gap-6 py-3 border-y border-zinc-800/80 text-xs">
