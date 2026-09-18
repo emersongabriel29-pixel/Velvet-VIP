@@ -120,7 +120,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
           category,hashtags:tags,isPremium:accessType==='premium',
           premiumPrice:accessType==='premium'?premiumPrice:0,
           requiredTier:accessType==='premium'?requiredTier:'free',isDraft:asDraft,
-          contentKind:mode as 'short' | 'long',durationSeconds
+          contentKind:mode as 'short' | 'long',durationSeconds,
+          anonymousAccess:accessType==='public',
+          accessType:accessType==='public'?'free':accessType==='followers'?'subscription':'pay_per_view'
         });
         setUploadProgress(100);
       } else {
@@ -336,7 +338,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
                   >
                     <Globe className="w-4 h-4" />
                     <span>Público</span>
-                    <span className="text-[10px] opacity-70">Gratuito</span>
+                    <span className="text-[10px] opacity-70">Gratuito • sem login após moderação</span>
                   </button>
 
                   <button
