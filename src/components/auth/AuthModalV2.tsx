@@ -6,13 +6,22 @@ import { isSupabaseConfigured } from '../../lib/supabase';
 interface AuthModalProps { isOpen: boolean; onClose: () => void; onOpenTerms?: () => void; defaultMode?: 'login' | 'register'; }
 
 export const AuthModalV2: React.FC<AuthModalProps> = ({ isOpen, onClose, onOpenTerms, defaultMode = 'login' }) => {
-  const { login, register, requestPasswordReset, switchUser, allUsers } = useAuth();
+  const { login, logout, register, requestPasswordReset, switchUser, allUsers, currentUser, isAuthenticated } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>(defaultMode);
   const [email, setEmail] = useState(''); const [password, setPassword] = useState('');
   const [name, setName] = useState(''); const [username, setUsername] = useState(''); const [birthDate, setBirthDate] = useState(''); const [role, setRole] = useState<'user' | 'creator'>('user');
   const [confirm, setConfirm] = useState(''); const [showPassword, setShowPassword] = useState(false); const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState(''); const [accepted, setAccepted] = useState(false);
   if (!isOpen) return null;
   const age = birthDate ? Math.floor((Date.now() - new Date(birthDate).getTime()) / 31557600000) : 0;
+
+  const changeAccount = async () => {
+    setError(''); setSuccess('');
+    if (isAuthenticated) {
+      await logout();
+      setSuccess('Sessão encerrada. Entre com a conta VIP, Criador ou Admin desejada.');
+    }
+    setEmail(''); setPassword(''); setMode('login');
+  };
 
   const submitLogin = async (e: React.FormEvent) => {
     e.preventDefault(); setError(''); setSuccess(''); setLoading(true);
@@ -48,6 +57,7 @@ export const AuthModalV2: React.FC<AuthModalProps> = ({ isOpen, onClose, onOpenT
     <div className="relative w-full max-w-md rounded-3xl border border-zinc-800 bg-[#121217] p-6 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
       <button onClick={onClose} className="absolute right-4 top-4 rounded-full bg-zinc-900 p-2 text-zinc-400 hover:text-white"><X className="h-5 w-5" /></button>
       <div className="mb-6 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-rose-600 to-amber-500 text-white"><Sparkles className="h-6 w-6" /></div><h2 className="text-xl font-black text-white">VELVET <span className="text-rose-500">VIP</span> <span className="text-[10px] text-rose-400">18+</span></h2><p className="mt-1 text-xs text-zinc-400">Autenticação segura e controle de idade.</p></div>
+      {isAuthenticated && <div className="mb-4 rounded-xl border border-zinc-800 bg-zinc-900/70 p-3"><p className="text-xs text-zinc-300">Conectado como <strong>{currentUser.name}</strong> · {currentUser.role === 'user' ? 'VIP' : currentUser.role === 'creator' ? 'Criador' : 'Admin'}</p><button type="button" onClick={changeAccount} className="mt-2 w-full rounded-lg border border-rose-500/30 px-3 py-2 text-xs font-bold text-rose-300 hover:bg-rose-950/30">Sair desta conta e trocar</button></div>}
       <div className="mb-5 grid grid-cols-2 rounded-xl border border-zinc-800 bg-zinc-900/70 p-1"><button onClick={() => setMode('login')} className={`rounded-lg py-2 text-xs font-bold ${mode === 'login' ? 'bg-rose-600 text-white' : 'text-zinc-400'}`}>Entrar</button><button onClick={() => setMode('register')} className={`rounded-lg py-2 text-xs font-bold ${mode === 'register' ? 'bg-rose-600 text-white' : 'text-zinc-400'}`}>Criar conta</button></div>
       {error && <div className="mb-4 flex gap-2 rounded-xl border border-rose-500/40 bg-rose-950/50 p-3 text-xs text-rose-200"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
       {success && <div className="mb-4 flex gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/50 p-3 text-xs text-emerald-200"><CheckCircle2 className="h-4 w-4 shrink-0" />{success}</div>}
