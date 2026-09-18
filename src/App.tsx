@@ -23,6 +23,8 @@ import { LivePage } from './components/live/LivePage';
 import { CommunityPage } from './components/community/CommunityPage';
 import { CreateHub } from './components/creator/CreateHub';
 import { LiveStudio } from './components/live/LiveStudio';
+import { ProductHub, ProductTool } from './components/product/ProductHub';
+import { ProductToolPage } from './components/product/ProductToolPage';
 
 const VelvetVipApp: React.FC = () => {
   const { hasConsented18Plus } = useAuth();
@@ -36,6 +38,7 @@ const VelvetVipApp: React.FC = () => {
   const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [lgpdModalOpen, setLgpdModalOpen] = useState(false);
+  const [productTool, setProductTool] = useState<ProductTool>('search');
 
   const handleSelectCreator = (creatorId: string) => { setSelectedCreatorId(creatorId); setActiveView('profile'); };
   const handleSelectVideo = (_videoId: string) => { setActiveView('feed'); };
@@ -55,6 +58,8 @@ const VelvetVipApp: React.FC = () => {
       {activeView === 'live' && <LivePage onBack={() => setActiveView('feed')} />}
       {activeView === 'live_studio' && <LiveStudio onBack={() => setActiveView('creator_studio')} onOpenLives={() => setActiveView('live')} />}
       {activeView === 'community' && <CommunityPage onBack={() => setActiveView('feed')} />}
+      {activeView === 'more' && <ProductHub onOpen={(tool) => { setProductTool(tool); setActiveView('product_tool'); }} />}
+      {activeView === 'product_tool' && <ProductToolPage tool={productTool} onBack={() => setActiveView('more')} />}
       {activeView === 'monetization' && <MonetizationPage onBack={() => setActiveView('feed')} />}
       {activeView === 'landing' && <LandingPage onEnterApp={() => setActiveView('feed')} onOpenUpload={() => setCreateHubOpen(true)} />}
     </main>

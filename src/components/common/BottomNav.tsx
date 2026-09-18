@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Compass, Plus, Bell, User as UserIcon, ShieldAlert } from 'lucide-react';
+import { Home, Compass, Plus, Bell, User as UserIcon, ShieldAlert, Grid2X2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { dbService } from '../../services/db';
 
@@ -102,6 +102,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             Perfil
           </span>
         </button>
+
+        <button id="nav-btn-more" onClick={() => onViewChange('more')} className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 transition-colors ${activeView === 'more' || activeView === 'product_tool' ? 'text-white' : 'text-zinc-400'}`}><Grid2X2 className={`w-5 h-5 ${activeView === 'more' || activeView === 'product_tool' ? 'text-rose-500' : ''}`}/><span className="text-[10px] font-medium">Mais</span></button>
 
         {/* Admin Tab (If role === 'admin') */}
         {currentUser.role === 'admin' && (
