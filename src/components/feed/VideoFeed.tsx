@@ -144,7 +144,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
 
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
-  }, [activeIndex, videos.length]);
+  }, [activeIndex, liveItems.length, videos.length]);
 
   // Keyboard navigation: Arrow Up / Down to switch videos
   useEffect(() => {
@@ -166,10 +166,10 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeIndex, videos.length, selectedVideoForComments, selectedVideoForShare, selectedVideoForReport, selectedVideoForSubscribe]);
+  }, [activeIndex, liveItems.length, videos.length, selectedVideoForComments, selectedVideoForShare, selectedVideoForReport, selectedVideoForSubscribe]);
 
   const scrollToIndex = (index: number) => {
-    if (index < 0 || index >= videos.length) return;
+    if (index < 0 || index >= (liveItems.length + videos.length)) return;
     const container = containerRef.current;
     if (!container) return;
 
