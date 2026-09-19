@@ -35,8 +35,8 @@ Deno.serve(async(req)=>{
   let entitled=creator?.user_id===user.id||profile.role==='admin';
   if(!entitled&&profile.platform_plan_id){
     const {data:plan}=await admin.from('platform_plans').select('slug,is_active').eq('id',profile.platform_plan_id).maybeSingle();
-    const rank:Record<string,number>={gratis:0,plus:1,vip:2};
-    entitled=Boolean(plan?.is_active&&(rank[plan.slug]||0)>=(rank[live.required_plan]||1));
+    const rank:Record<string,number>={gratis:0,free:0,plus:1,vip:2};
+    entitled=Boolean(plan?.is_active&&(rank[plan.slug]||0)>=(rank[live.required_plan]??0));
   }
   if(!entitled)return json(req,{error:'Required platform plan not active'},403);
 
