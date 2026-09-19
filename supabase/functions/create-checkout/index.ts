@@ -61,6 +61,11 @@ Deno.serve(async (req) => {
     referenceId = video.id;
     metadata.creator_id = video.creator_id;
     metadata.video_id = video.id;
+  } else if (kind === 'live_solo' && body.creatorId && body.liveId) {
+    const { data: live } = await admin.from('live_sessions').select('id,creator_id,solo_enabled,solo_price,status,moderation_status').eq('id',body.liveId).eq('creator_id',body.creatorId).single();
+    if (!live?.solo_enabled || Number(live.solo_price) <= 0 || live.moderation_status !== 'approved') return json(req,{ error: 'Live Solo indisponível.' },400);
+    amount=Number(live.solo_price); description='Live Solo privada com criador Velvet VIP'; referenceId=live.id;
+    metadata.creator_id=live.creator_id; metadata.live_id=live.id;
   } else if (kind === 'tip' && body.creatorId) {
     amount = Number(body.amount);
     if (!Number.isFinite(amount) || amount < 1 || amount > 9999) return json(req,{ error: 'Valor de gorjeta inválido.' }, 400);
@@ -68,6 +73,7 @@ Deno.serve(async (req) => {
     referenceId = body.creatorId;
     metadata.message = String(body.message || '').slice(0, 500);
     metadata.creator_id = body.creatorId;
+    if (body.liveId) metadata.live_id=body.liveId;
   } else {
     return json(req,{ error: 'Dados de checkout incompletos.' }, 400);
   }
