@@ -1,46 +1,62 @@
-# Production Status — Velvet VIP
+# Production status — Velvet VIP
 
-Atualizado em 18/09/2026. Este documento separa código versionado de serviços que precisam ser configurados e testados no ambiente real.
+Verificado em 19/09/2026 contra o repositório (base `667ce08`) e o projeto Supabase `kdhcczkhsxjfhfyhmxht`. Este registro distingue código, implantação e operação comprovada.
 
-## Estado atual
+## Conferido antes desta revisão
 
-| Área | Estado | Observação |
+- `comment_likes` já constava no banco (`20260919120144`); não foi reaplicada.
+- Destaques, parâmetros administrativos, helpers privados, proteções financeiras, índices e ajustes RLS já estavam aplicados.
+- Player `hls.js` já existia. Isso não comprova transcodificação, CDN ou ingestão de lives.
+- Os seis endpoints anteriores estavam ativos; não havia worker de transcodificação no repositório.
+
+## Alterações desta revisão
+
+| Área | Entrega | Evidência / limite |
 |---|---|---|
-| Frontend React/Vite/TypeScript | Implementado | CI valida typecheck, testes e build |
-| Autenticação Supabase | Parcial/real | Requer variáveis do projeto e políticas aplicadas |
-| Banco e RLS | Implementado no código SQL | Executar as migrações 001–028 no projeto correto |
-| Planos da plataforma | Implementado | Mensal, semestral, anual, benefícios, ativo/inativo |
-| Planos dos criadores | Implementado | Persistidos em subscription_plans |
-| Pagamentos Mercado Pago | Implementado no servidor | Exige credenciais, webhook público e testes de sandbox |
-| Ledger e estados financeiros | Estruturado | PENDING, APPROVED, AVAILABLE, WITHDRAWN, REFUNDED, CHARGEBACK |
-| Saques | Parcial | Fluxo de solicitação existe; repasse bancário e revisão antifraude precisam de operação |
-| KYC/idade de criadores | Estrutura pronta | É necessário contratar/conectar um provedor de verificação |
-| Moderação | Fila e regras estruturadas | Classificador de IA e revisão humana precisam de provedor/equipe |
-| Upload privado | Estruturado | Upload real implementado no código; aplicar migrações/policies e validar em staging |
-| Streaming HLS/CDN | Planejado/estrutura pronta | Media jobs existem; falta worker de transcodificação e CDN |
-| Watermark | Campo e política prontos | Renderização dinâmica deve ser feita no pipeline de vídeo |
-| Antifraude | Estrutura pronta | Requer regras de risco, webhooks de chargeback e revisão |
-| Observabilidade | Eventos estruturados | Conectar Sentry/logs/alertas/uptime |
-| LGPD e termos | Documentação inicial | Validar com jurídico antes do lançamento |
-| Testes E2E | Ainda necessário | Fazer em ambiente de staging com pagamentos sandbox |
+| Compras | Consulta compras e assinaturas da conta autenticada, resolve thumbnails privados | Não anuncia renovação automática: checkout atual compra um período |
+| Notificações | Leitura e marcação no Supabase, contador real | RLS continua limitando por proprietário |
+| Explorar / categorias | Catálogo real de vídeos, criadores aprovados e categorias administrativas | Lista limitada aos 100 vídeos mais recentes; busca local nessa lista |
+| Denúncias | Envio para `safety_reports`, a fila usada pelo Admin | Sucesso exibido somente após confirmação do banco |
+| Exportação da conta | Exporta registros próprios com paginação | Escopo informado no JSON; não representa auditoria jurídica ou todos os dados internos |
+| Planos de criador | Um editor real, dentro da aba Planos | Formulário duplicado que gravava só local foi retirado |
+| Demonstração | Instância local só existe com `VITE_DEMO_MODE` explícito; chamadas locais bloqueadas fora do demo | Código legado permanece para demonstração |
+| Upload | Fonte não é apagada se o cadastro existir e o enfileiramento falhar | Worker e recuperação operacional da fila seguem pendentes |
+| Reprodução | Valida publicação/moderação/processamento; assinatura não libera PPV separado | URLs já emitidas permanecem válidas por até 120 segundos |
+| HLS | Callback estável e recuperação limitada de falhas fatais | Não substitui pipeline de mídia ou proteção de segmentos na CDN |
+| Pagamento | Liquidação atômica, atribuição do acesso ao checkout, reembolso sem revogar recompra posterior | Testes de banco; não transação real no Mercado Pago |
+| Webhook | Confere ID assinado versus pagamento consultado; falhas retornam 503 para retry | Não confirma recebimento quando a liquidação falhou |
+| Dependências | Lockfile npm e `npm ci` nos workflows | Auditoria local: zero vulnerabilidades reportadas |
+| Staging | Testes reais de login/RLS e bloqueio de RPC financeira | Ausência de secrets agora reprova o gate; contratos verdes não significam staging validado |
 
-## Ordem de lançamento
+## Banco e Edge Functions
 
-1. Criar projeto Supabase de staging e aplicar as migrações 001–028.
-2. Confirmar RLS, storage privado, função de URL assinada e usuário administrador.
-3. Configurar Mercado Pago em sandbox e testar aprovação, falha, duplicidade, reembolso e chargeback.
-4. Conectar KYC de criadores e bloquear publicação sem identidade verificada e direitos confirmados.
-5. Conectar transcodificação HLS, thumbnails, watermark e CDN.
-6. Configurar moderação automática antes da publicação e fila humana.
-7. Configurar Sentry, logs, alertas, backup e monitoramento.
-8. Executar testes E2E e teste de segurança em staging.
-9. Validar LGPD, política de conteúdo, termos, suporte e plano de incidentes.
-10. Só então habilitar produção e pagamentos reais.
+Aplicada a migration `20260919162845_atomic_payment_settlement.sql`.
+A função `settle_verified_payment` é `SECURITY INVOKER` e executável somente por `service_role` (além do proprietário do banco). Anon e authenticated não têm EXECUTE.
 
-## Critério de pronto
+Atualizações implantadas nesta revisão: `payment-webhook` v5, `create-checkout` v3 e `get-video-url` v5. A reprodução pública usa autenticação no corpo da função: somente conteúdo gratuito, sensual, publicado, aprovado e pronto dispensa login. Conteúdo restrito exige sessão e autorização. Os endpoints legados de pagamento foram preservados para compatibilidade e não foram certificados nesta revisão.
 
-O lançamento só deve ser considerado pronto quando os fluxos acima forem testados com dados reais de staging, sem conteúdo ilegal, e houver responsável pela moderação, suporte financeiro, chargebacks e incidentes.
+## Verificações executadas
 
-## Gate automatizado de staging
+- TypeScript e build Vite aprovados.
+- 71 testes Node aprovados, incluindo execução dos handlers HTTP com clientes/provedor simulados.
+- `tests/sql/payment-settlement.sql` executado no banco real dentro de transação com ROLLBACK: valor adulterado, aprovação, duplicidade, evento atrasado, reembolso, recompra, falha parcial, retry, assinatura e chargeback.
+- Fixtures SQL foram desfeitas; não houve cobrança, transferência ou reembolso real.
+- Smoke HTTP após implantação: vídeo sem ID retorna 400, checkout sem sessão retorna 401; webhook retorna 503 "Webhook não configurado", comprovando ausência de pelo menos uma credencial necessária (`MERCADOPAGO_ACCESS_TOKEN`/`MERCADOPAGO_WEBHOOK_SECRET`).
+- Advisor de segurança sem novos alertas de banco; permanece `Leaked Password Protection Disabled`.
 
-O workflow `Staging gate` executa contratos em todo PR. Os testes de integração real só executam quando os secrets `STAGING_*` estiverem configurados no GitHub. Ausência desses secrets gera aviso e **não constitui aprovação de staging**. O lançamento continua bloqueado até que os cenários de `SECURITY_E2E.md` sejam executados contra infraestrutura isolada real.
+## Pendências para lançamento público
+
+| Pendência | O que falta |
+|---|---|
+| Senhas vazadas | Organização no Free; recurso nativo exige Pro ou superior. Nenhum upgrade contratado |
+| Vídeo 360p–4K/HLS | Worker/provedor, processamento real, segmentos protegidos, CDN e testes de reprodução longa |
+| Lives | Ingestão, distribuição, reconexão, gravação e moderação ao vivo em provedor real |
+| Mercado Pago | Credenciais/ambiente de teste, compra até webhook, concorrência real, recusa e estorno no gateway |
+| Plataforma paga | Vigência/renovação do plano geral ainda precisa de ciclo completo; não há recorrência automática certificada |
+| Saques | Repasse bancário real, conciliação e operação antifraude |
+| Staging/E2E | Projeto isolado, contas e secrets `STAGING_*`; fixtures de mídia/pagamento; teste mobile em aparelhos |
+| KYC | Provedor de identidade e idade com callbacks verificados |
+| Observabilidade | Destino externo de alertas, monitoramento, responsáveis e teste de incidente |
+| Operação | Restauração de backup, pentest externo, jurídico/LGPD, moderação e suporte responsáveis |
+
+**Decisão: NO-GO para lançamento público.** Só então habilitar produção comercial: após comprovar as pendências acima conforme `LAUNCH_GATE.md`. Atualizar código/backend não equivale a autorizar clientes e dinheiro reais.

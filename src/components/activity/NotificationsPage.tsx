@@ -10,7 +10,7 @@ import {
   CheckCheck
 } from 'lucide-react';
 import { Notification } from '../../types';
-import { dbService } from '../../services/db';
+import { loadNotifications as fetchNotifications, markNotificationsRead } from '../../services/accountData';
 import { useAuth } from '../../hooks/useAuth';
 
 interface NotificationsPageProps {
@@ -22,31 +22,41 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
   onSelectVideo,
   onSelectCreator,
 }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
+  const [error, setError] = useState('');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<'all' | 'interactions' | 'monetization'>('all');
 
-  const loadNotifications = () => {
-    setNotifications(isAuthenticated ? dbService.getNotifications() : []);
+  const loadNotifications = async () => {
+    if (!isAuthenticated) { setNotifications([]); return; }
+    try { setNotifications(await fetchNotifications()); setError(''); }
+    catch { setError('Não foi possível carregar suas notificações.'); }
   };
 
   useEffect(() => {
-    loadNotifications();
-    const refresh = () => loadNotifications();
+    let active = true;
+    setNotifications([]);
+    const refresh = () => {
+      if (!isAuthenticated) return;
+      fetchNotifications().then(rows => { if (active) { setNotifications(rows); setError(''); } })
+        .catch(() => { if (active) setError('Não foi possível carregar suas notificações.'); });
+    };
+    refresh();
     const timer = window.setInterval(refresh, 15000);
     window.addEventListener('focus', refresh);
     window.addEventListener('storage', refresh);
     return () => {
+      active = false;
       window.clearInterval(timer);
       window.removeEventListener('focus', refresh);
       window.removeEventListener('storage', refresh);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, currentUser.id]);
 
-  const handleMarkAllRead = () => {
+  const handleMarkAllRead = async () => {
     if (!isAuthenticated) return;
-    dbService.markAllNotificationsAsRead();
-    loadNotifications();
+    try { await markNotificationsRead(); await loadNotifications(); }
+    catch { setError('Não foi possível marcar as notificações como lidas.'); }
   };
 
   const filtered = notifications.filter((n) => {
@@ -80,6 +90,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
 
   return (
     <div className="min-h-screen bg-[#09090b] text-white pt-16 pb-20 max-w-2xl mx-auto px-4 sm:px-6">
+      {error && <p role="alert" className="mb-3 text-rose-400">{error}</p>}
       {/* Header */}
       <div className="flex items-start justify-between gap-3 pb-3 border-b border-zinc-800 mb-3">
         <div>
@@ -140,20 +151,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
       )}
 
       {/* Notifications List */}
-      {!isAuthenticated && (
-        <div className="mb-4 grid gap-3 sm:grid-cols-2">
-          <button onClick={() => onSelectCreator?.('creator-001')} className="rounded-2xl border border-rose-500/20 bg-rose-950/10 p-4 text-left hover:border-rose-500/50">
-            <Crown className="mb-3 h-5 w-5 text-amber-400" />
-            <p className="text-sm font-bold text-white">Criadores para conhecer</p>
-            <p className="mt-1 text-xs text-zinc-400">Explore perfis em destaque. Crie uma conta para seguir seus favoritos.</p>
-          </button>
-          <button onClick={() => onSelectVideo?.('video-001')} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 text-left hover:border-rose-500/40">
-            <Bell className="mb-3 h-5 w-5 text-rose-400" />
-            <p className="text-sm font-bold text-white">Novos conteúdos</p>
-            <p className="mt-1 text-xs text-zinc-400">Veja lançamentos gratuitos e descubra novos criadores.</p>
-          </button>
-        </div>
-      )}
+      {!isAuthenticated && <p className="mb-4 text-sm text-zinc-400">Faça login para acompanhar as interações da sua conta.</p>}
       <div className="space-y-2">
         {!isAuthenticated ? null : filtered.length === 0 ? (
           <div className="py-16 text-center text-zinc-500">

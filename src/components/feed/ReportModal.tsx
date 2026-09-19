@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Flag, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { ReportReason, Video } from '../../types';
-import { dbService } from '../../services/db';
+import { submitVideoReport } from '../../services/accountData';
 
 interface ReportModalProps {
   video: Video;
@@ -23,17 +23,17 @@ export const ReportModal: React.FC<ReportModalProps> = ({ video, isOpen, onClose
   const [description, setDescription] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
+  const [error, setError] = useState('');
+  const [sending, setSending] = useState(false);
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    dbService.submitReport({
-      target_type: 'video',
-      target_id: video.id,
-      target_title: video.title,
-      reason: selectedReason,
-      description: description.trim() || 'Denúncia padrão do usuário',
-    });
+    if (sending) return;
+    setSending(true); setError('');
+    try { await submitVideoReport(video, selectedReason, description.trim()); }
+    catch (err: any) { setError(err.message || 'Não foi possível enviar a denúncia.'); setSending(false); return; }
+    setSending(false);
     setSubmitted(true);
     setTimeout(() => {
       setSubmitted(false);
@@ -57,6 +57,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ video, isOpen, onClose
           </button>
         </div>
 
+        {error && <p role="alert" className="text-sm text-rose-400">{error}</p>}
         {submitted ? (
           <div className="py-8 text-center space-y-2">
             <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto animate-bounce" />
@@ -123,7 +124,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ video, isOpen, onClose
                 Cancelar
               </button>
               <button
-                type="submit"
+                type="submit" disabled={sending}
                 className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-xl text-xs transition-colors shadow-lg shadow-rose-950/40 cursor-pointer"
               >
                 Enviar Denúncia

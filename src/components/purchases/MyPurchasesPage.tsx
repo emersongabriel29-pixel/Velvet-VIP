@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Play, Crown, CheckCircle2, Clock, XCircle, ArrowLeft } from 'lucide-react';
 import { dbService } from '../../services/db';
+import { isDemoMode } from '../../lib/supabase';
+import { loadPurchases } from '../../services/accountData';
+import { useAuth } from '../../hooks/useAuth';
 import { Video, Subscription } from '../../types';
 
 interface MyPurchasesPageProps {
@@ -16,16 +19,27 @@ export const MyPurchasesPage: React.FC<MyPurchasesPageProps> = ({
   const [purchasedVideos, setPurchasedVideos] = useState<Video[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
 
-  const loadData = () => {
-    setPurchasedVideos(dbService.getPurchasedVideos());
-    setSubscriptions(dbService.getSubscriptions());
+  const { currentUser, isAuthenticated } = useAuth();
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const loadData = async () => {
+    try { const data = await loadPurchases(); setPurchasedVideos(data.videos); setSubscriptions(data.subscriptions); setError(''); }
+    catch { setError('Não foi possível carregar suas compras. Tente novamente.'); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    let active = true;
+    setPurchasedVideos([]); setSubscriptions([]); setLoading(true);
+    if (!isAuthenticated) { setLoading(false); return; }
+    loadPurchases().then(data => { if (active) { setPurchasedVideos(data.videos); setSubscriptions(data.subscriptions); setError(''); } })
+      .catch(() => { if (active) setError('Não foi possível carregar suas compras. Tente novamente.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [currentUser.id, isAuthenticated]);
 
   const handleCancelSubscription = (subId: string) => {
+    if (!isDemoMode) return;
     if (confirm('Deseja realmente cancelar esta assinatura? Você perderá o acesso VIP ao final do período atual.')) {
       dbService.cancelSubscription(subId);
       loadData();
@@ -34,6 +48,9 @@ export const MyPurchasesPage: React.FC<MyPurchasesPageProps> = ({
 
   return (
     <div className="min-h-screen bg-[#09090b] text-white pt-16 pb-20 max-w-4xl mx-auto px-4 sm:px-6">
+      {loading && <p role="status">Carregando compras…</p>}
+      {error && <p role="alert" className="mb-4 text-rose-400">{error} <button onClick={loadData}>Tentar novamente</button></p>}
+      {!isAuthenticated && <p>Faça login para acessar suas compras.</p>}
       {/* Header */}
       <div className="flex items-center gap-3 pb-4 border-b border-zinc-800 mb-6">
         <button
@@ -86,7 +103,7 @@ export const MyPurchasesPage: React.FC<MyPurchasesPageProps> = ({
               <ShoppingBag className="w-12 h-12 mx-auto mb-2 opacity-30 stroke-[1.5]" />
               <h3 className="text-sm font-bold text-zinc-300">Nenhum vídeo comprado ainda</h3>
               <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
-                Quando você compra vídeos individuais exclusivos em Pay-Per-View, eles ficam arquivados aqui permanentemente.
+                Quando você compra vídeos individuais exclusivos em Pay-Per-View, eles aparecem aqui enquanto o acesso estiver válido.
               </p>
             </div>
           ) : (
@@ -161,19 +178,19 @@ export const MyPurchasesPage: React.FC<MyPurchasesPageProps> = ({
                       </span>
                     </h4>
                     <p className="text-xs text-zinc-400 mt-0.5">
-                      R$ {sub.price.toFixed(2).replace('.', ',')} / mês • Renovação automática
+                      R$ {Number(sub.price || sub.amount || 0).toFixed(2).replace('.', ',')} • Pagamento pelo período contratado
                     </p>
                     <div className="flex items-center gap-3 text-[11px] text-zinc-500 mt-1">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        Próxima renovação: {new Date(sub.next_billing_date).toLocaleDateString('pt-BR')}
+                        Acesso até: {new Date(sub.next_billing_date).toLocaleDateString('pt-BR')}
                       </span>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {sub.status === 'active' ? (
+                  {sub.status === 'active' && isDemoMode ? (
                     <button
                       onClick={() => handleCancelSubscription(sub.id)}
                       className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-rose-950/50 hover:text-rose-400 text-zinc-300 text-xs font-semibold transition-colors cursor-pointer"
@@ -183,7 +200,7 @@ export const MyPurchasesPage: React.FC<MyPurchasesPageProps> = ({
                   ) : (
                     <span className="px-3 py-1 rounded-full bg-zinc-800 text-zinc-400 text-xs flex items-center gap-1">
                       <XCircle className="w-3.5 h-3.5 text-zinc-500" />
-                      <span>Cancelada</span>
+                      <span>{sub.status === 'active' ? 'Sem renovação automática' : sub.status === 'expired' ? 'Expirada' : 'Cancelada'}</span>
                     </span>
                   )}
                 </div>

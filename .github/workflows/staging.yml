@@ -1,4 +1,4 @@
-name: Staging gate
+name: Staging verification
 
 on:
   workflow_dispatch:
@@ -22,12 +22,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+      - run: npm ci
       - name: Staging configuration contract
         run: npm run test:staging-contract
       - name: Real staging integration suite
         if: ${{ env.STAGING_SUPABASE_URL != '' && env.STAGING_SUPABASE_ANON_KEY != '' }}
         run: npm run test:staging
-      - name: Explain missing external staging
+      - name: Fail when real staging was not verified
         if: ${{ env.STAGING_SUPABASE_URL == '' || env.STAGING_SUPABASE_ANON_KEY == '' }}
-        run: echo "::notice::Real staging tests were not run because staging secrets are not configured."
+        run: |
+          echo "::error::Real staging was not verified. Configure STAGING_* secrets; repository contracts are insufficient."
+          exit 1

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { User, Creator, UserRole } from '../types';
 import { dbService } from '../services/db';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { isSupabaseConfigured, isDemoMode, supabase } from '../lib/supabase';
 
 interface AuthContextType {
   currentUser: User;
@@ -50,7 +50,7 @@ function mapProfile(profile: any, email = ''): User {
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const demoMode = !isSupabaseConfigured;
+  const demoMode = isDemoMode;
   const [currentUser, setCurrentUser] = useState<User>(() => demoMode ? dbService.getCurrentUser() : guestUser);
   const [currentCreator, setCurrentCreator] = useState<Creator | undefined>(() => demoMode ? dbService.getCreatorByUserId(dbService.getCurrentUser().id) : undefined);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => demoMode);
@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    if (demoMode || !supabase) {
+    if (demoMode) {
       const unsub = dbService.subscribe(() => {
         const u = dbService.getCurrentUser();
         setCurrentUser(u);
@@ -85,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return unsub;
     }
 
+    if (!supabase) return;
     let mounted = true;
     supabase.auth.getSession().then(async ({ data }) => {
       if (!mounted) return;
