@@ -1,0 +1,4 @@
+-- Historical migration marker: security_advisor_rpc_hardening
+-- Already applied to the linked Supabase project before repository migration
+-- history was normalized. Intentionally no-op: this file aligns the migration
+-- version without replaying production bootstrap/data operations.
