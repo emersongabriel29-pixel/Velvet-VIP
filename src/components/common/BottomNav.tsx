@@ -17,7 +17,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   onOpenAuthModal,
 }) => {
   const { currentUser, isAuthenticated } = useAuth();
-  const unreadCount = isAuthenticated ? dbService.getNotifications().filter(n => !n.read).length : 0;
+  const unreadCount = (isAuthenticated ? dbService.getNotifications() : dbService.getVisitorNotifications()).filter(n => !n.read).length;
 
   return (
     <nav
