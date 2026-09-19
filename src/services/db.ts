@@ -1353,6 +1353,55 @@ class DatabaseService {
     return this.notifications.filter(n => n.user_id === cur.id);
   }
 
+  // Public notification stream for visitors. It never exposes private account,
+  // purchase, subscription or interaction notifications.
+  public getVisitorNotifications(): Notification[] {
+    const creators = this.creators
+      .filter(c => c.is_approved)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5);
+
+    const videos = this.videos
+      .filter(v => !v.is_draft && !v.is_removed && v.moderation_status !== 'rejected' && v.anonymous_access !== false)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 8);
+
+    const creatorNotifs: Notification[] = creators.map(c => ({
+      id: 'visitor-creator-' + c.id,
+      user_id: 'visitor',
+      sender_id: c.user_id,
+      sender_name: c.display_name,
+      sender_avatar: c.avatar_url,
+      type: 'new_creator',
+      title: 'Novo criador',
+      message: 'começou a publicar no Velvet VIP.',
+      target_id: c.id,
+      read: false,
+      created_at: c.created_at,
+    }));
+
+    const contentNotifs: Notification[] = videos.map(v => {
+      const creator = this.creators.find(c => c.id === v.creator_id);
+      return {
+        id: 'visitor-content-' + v.id,
+        user_id: 'visitor',
+        sender_id: creator?.user_id,
+        sender_name: creator?.display_name || 'Velvet VIP',
+        sender_avatar: creator?.avatar_url,
+        type: 'new_content',
+        title: 'Novo conteúdo',
+        message: 'publicou um novo conteúdo' + (v.access_type === 'free' || !v.is_premium ? ' gratuito.' : ' exclusivo para assinantes.'),
+        target_id: creator?.id,
+        target_video_id: v.id,
+        read: false,
+        created_at: v.created_at,
+      } as Notification;
+    });
+
+    return [...contentNotifs, ...creatorNotifs]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
   public addNotification(data: Omit<Notification, 'id' | 'created_at' | 'read'>) {
     const newNotif: Notification = {
       id: 'notif-' + Date.now() + Math.random().toString(36).substring(2, 5),
