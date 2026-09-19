@@ -9,7 +9,7 @@ import { ReportModal } from './ReportModal';
 import { SubscribeModal } from '../creator/SubscribeModal';
 import { AdBanner } from '../ads/AdBanner';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured, isDemoMode } from '../../lib/supabase';
 import { resolvePrivateMediaRefs } from '../../services/media';
 
 interface VideoFeedProps {
@@ -40,10 +40,11 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
 
   // Load videos based on tab
   const refreshFeed = async () => {
-    if (!isSupabaseConfigured || !supabase) {
+    if (isDemoMode) {
       setVideos(dbService.getVideos(currentTab));
       return;
     }
+    if (!supabase) { setVideos([]); setError('Backend de produção indisponível.'); return; }
     let query = supabase.from('videos').select('*, creator:creators(*)').eq('is_draft', false).eq('is_removed', false).eq('moderation_status', 'approved').eq('media_status', 'ready');
     if (currentTab === 'premium') query = query.eq('is_premium', true);
     if (currentTab === 'foryou') query = query.order('is_premium', { ascending: true }).order('created_at', { ascending: false });
@@ -110,7 +111,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
   }, [currentTab]);
 
   useEffect(() => {
-    if(isSupabaseConfigured) return;
+    if(!isDemoMode) return;
     const unsub = dbService.subscribe(() => { void refreshFeed(); });
     return unsub;
   }, [currentTab]);

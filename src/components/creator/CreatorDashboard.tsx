@@ -22,7 +22,7 @@ import { dbService } from '../../services/db';
 import { useAuth } from '../../hooks/useAuth';
 import { CreatorAnalyticsPanel } from './CreatorAnalyticsPanel';
 import { CreatorPlansManager } from './CreatorPlansManager';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isDemoMode } from '../../lib/supabase';
 import { uploadProfileImage, getProfileImageUrl } from '../../services/media';
 
 interface CreatorDashboardProps {
@@ -55,8 +55,8 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   const [plansSaved, setPlansSaved] = useState(false);
 
   const creator: Creator = currentCreator || {
-    id: 'cr-default',
-    user_id: 'usr-default',
+    id: isDemoMode ? 'cr-default' : '',
+    user_id: isDemoMode ? 'usr-default' : '',
     handle: 'criador_vip',
     display_name: 'Criador Velvet VIP',
     avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&fit=crop',
@@ -77,9 +77,14 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
 
   const loadData = async () => {
     if (!creator.id) return;
-    if (!isSupabaseConfigured || !supabase) {
+    if (isDemoMode) {
       setVideos(dbService.getVideosByCreator(creator.id));
       setWithdrawals(dbService.getWithdrawals());
+      return;
+    }
+    if (!supabase) {
+      setPayoutMessage({type:'error',text:'Backend de produção indisponível.'});
+      setVideos([]); setWithdrawals([]);
       return;
     }
     const [videoRows,withdrawalRows]=await Promise.all([
@@ -97,7 +102,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   };
 
   const loadHighlights = async () => {
-    if(!isSupabaseConfigured || !supabase || !creator.id) return;
+    if(isDemoMode || !creator.id) return;
     const {data,error}=await supabase.from('creator_highlights').select('*').eq('creator_id',creator.id).order('sort_order').order('created_at',{ascending:false});
     if(error){setHighlightMessage(error.message);return;}
     const rows=await Promise.all((data||[]).map(async (h:any)=>({...h,display_url:await getProfileImageUrl(h.cover_url||h.media_url||'')})));
@@ -116,7 +121,8 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   const handleDeleteVideo = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Remover este vídeo? Ele deixará de aparecer para os usuários.')) return;
-    if(!isSupabaseConfigured || !supabase){ dbService.deleteVideo(id); await loadData(); return; }
+    if(isDemoMode){ dbService.deleteVideo(id); await loadData(); return; }
+    if(!supabase){setPayoutMessage({type:'error',text:'Backend de produção indisponível.'});return;}
     const {error}=await supabase.from('videos').update({is_removed:true,moderation_status:'removed'}).eq('id',id).eq('creator_id',creator.id);
     if(error) setPayoutMessage({type:'error',text:error.message}); else await loadData();
   };
@@ -127,9 +133,10 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
     if (isNaN(amt) || amt <= 0) { setPayoutMessage({ type: 'error', text: 'Informe um valor válido para saque.' }); return; }
     if(!pixKey.trim()){setPayoutMessage({type:'error',text:'Informe sua chave PIX.'});return;}
     try {
-      if(!isSupabaseConfigured || !supabase){
+      if(isDemoMode){
         dbService.requestWithdrawal(creator.id, amt, pixKey, pixKeyType);
       }else{
+        if(!supabase) throw new Error('Backend de produção indisponível.');
         const {error}=await supabase.rpc('request_creator_withdrawal',{p_amount:amt,p_pix_key:pixKey.trim(),p_pix_key_type:pixKeyType});
         if(error) throw error;
       }
@@ -143,12 +150,27 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
     }
   };
 
-  const handleSavePlans = (e: React.FormEvent) => {
+  const handleSavePlans = async (e: React.FormEvent) => {
     e.preventDefault();
-    dbService.updateCreatorPlans(creator.id, basicPrice, vipPrice);
-    setPlansSaved(true);
-    setTimeout(() => setPlansSaved(false), 2500);
+    try{
+      if(isDemoMode){
+        dbService.updateCreatorPlans(creator.id, basicPrice, vipPrice);
+      }else{
+        if(!supabase) throw new Error('Backend de produção indisponível.');
+        const {error}=await supabase.rpc('update_creator_prices',{p_basic:basicPrice,p_vip:vipPrice});
+        if(error) throw error;
+      }
+      setPlansSaved(true);
+      setPayoutMessage(null);
+      setTimeout(() => setPlansSaved(false), 2500);
+    }catch(err:any){
+      setPayoutMessage({type:'error',text:err?.message||'Não foi possível atualizar os preços.'});
+    }
   };
+
+  if(!creator.id && !isDemoMode){
+    return <div className="min-h-screen bg-[#09090b] px-4 pb-24 pt-24 text-white"><div className="mx-auto max-w-xl rounded-3xl border border-amber-500/20 bg-amber-950/10 p-6"><h1 className="text-xl font-black">Área do criador indisponível</h1><p className="mt-2 text-sm text-zinc-400">Sua conta ainda não possui um perfil de criador aprovado. A publicação, os saques e os preços só são liberados depois da aprovação real.</p></div></div>;
+  }
 
   return (
     <div className="min-h-screen bg-[#09090b] text-white pt-16 pb-20 max-w-5xl mx-auto px-4 sm:px-6">

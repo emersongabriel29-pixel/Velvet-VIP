@@ -18,7 +18,7 @@ import {
 import { Video } from '../../types';
 import { dbService } from '../../services/db';
 import { getVideoPlaybackOptions, PlaybackSource } from '../../services/media';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured, isDemoMode } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { AdaptiveVideo } from '../common/AdaptiveVideo';
 
@@ -69,7 +69,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   useEffect(() => {
     let cancelled=false;
     (async()=>{
-      if(!isSupabaseConfigured || !supabase){
+      if(isDemoMode){
         if(!cancelled){
           setIsFollowing(video.creator_id?dbService.isFollowing(video.creator_id):false);
           setHasLiked(Boolean(video.has_liked));
@@ -130,9 +130,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             setIsPlaying(false);
           });
       }
-      if(isSupabaseConfigured && supabase){
+      if(supabase){
         if(isAuthenticated) void supabase.rpc('record_video_view',{p_video_id:video.id,p_duration_seconds:0});
-      }else dbService.recordView(video.id);
+      }else if(isDemoMode) dbService.recordView(video.id);
     } else {
       el.pause();
       setIsPlaying(false);
@@ -187,7 +187,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   const handleLike = async () => {
-    if(!isSupabaseConfigured || !supabase){
+    if(isDemoMode){
       const res=dbService.toggleLike(video.id);setHasLiked(res.hasLiked);setLikesCount(res.count);return;
     }
     if(!isAuthenticated)return;
@@ -199,7 +199,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   const handleFavorite = async () => {
-    if(!isSupabaseConfigured || !supabase){setHasFavorited(dbService.toggleFavorite(video.id));return;}
+    if(isDemoMode){setHasFavorited(dbService.toggleFavorite(video.id));return;}
     if(!isAuthenticated)return;
     const previous=hasFavorited;setHasFavorited(!previous);
     const {data,error}=await supabase.rpc('toggle_video_favorite',{p_video_id:video.id});
@@ -209,7 +209,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const handleToggleFollow = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!video.creator_id) return;
-    if(!isSupabaseConfigured || !supabase){setIsFollowing(dbService.toggleFollow(video.creator_id));return;}
+    if(isDemoMode){setIsFollowing(dbService.toggleFollow(video.creator_id));return;}
     if(!isAuthenticated)return;
     const previous=isFollowing;setIsFollowing(!previous);
     const {data,error}=await supabase.rpc('toggle_creator_follow',{p_creator_id:video.creator_id});

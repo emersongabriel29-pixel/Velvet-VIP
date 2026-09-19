@@ -46,7 +46,7 @@ export async function uploadCreatorVideo(input:{
       required_tier:input.isPremium?input.requiredTier:'free',
       category:input.category,hashtags:input.hashtags,is_draft:input.isDraft,
       access_type:input.accessType,content_level:'sensual',anonymous_access:input.anonymousAccess,
-      source_storage_path:videoPath,media_status:'ready',processing_status:input.contentKind==='long'?'queued':'ready'
+      source_storage_path:videoPath,media_status:input.contentKind==='long'?'processing':'ready',processing_status:input.contentKind==='long'?'queued':'ready'
     }).select('id').single();
     if(inserted.error||!inserted.data) throw new Error(inserted.error?.message||'Falha ao registrar o vídeo.');
     if(input.contentKind==='long'){
