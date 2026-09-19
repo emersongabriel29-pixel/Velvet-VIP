@@ -21,17 +21,20 @@ Deno.serve(async(req)=>{
   const {data:video}=await admin.from('videos').select('id,video_url,is_premium,creator_id,required_tier,access_type,content_level,anonymous_access,moderation_status,media_status,is_draft,is_removed,hls_manifest_path,hls_storage_path').eq('id',videoId).single();
   if(!video) return response(req,{error:'Video not found'},404);
 
+  const {data:owner}=await admin.from('creators').select('user_id').eq('id',video.creator_id).single();
+  if(!owner?.user_id) return response(req,{error:'Creator not found'},404);
   const anonymousAllowed=video.anonymous_access===true&&video.is_premium===false&&video.access_type==='free'&&video.required_tier==='free'&&video.content_level==='sensual'&&video.moderation_status==='approved'&&video.media_status==='ready'&&video.is_draft===false&&video.is_removed===false;
   if(!anonymousAllowed){
     const auth=req.headers.get('Authorization');
     if(!auth?.startsWith('Bearer ')) return response(req,{error:'Authentication required'},401);
     const {data:{user},error:authError}=await admin.auth.getUser(auth.slice(7));
     if(authError||!user) return response(req,{error:'Invalid session'},401);
-    const {data:profile}=await admin.from('profiles').select('age_verified,birth_date,is_blocked,is_suspended').eq('id',user.id).single();
+    const {data:profile}=await admin.from('profiles').select('age_verified,birth_date,is_blocked,is_suspended,role').eq('id',user.id).single();
     if(!profile?.age_verified||profile.is_blocked||profile.is_suspended||!profile.birth_date||new Date(profile.birth_date)>new Date(new Date().setFullYear(new Date().getFullYear()-18))) return response(req,{error:'18+ verification required'},403);
     if(video.is_premium){
-      const {data:purchase}=await admin.from('purchases').select('id').eq('user_id',user.id).eq('video_id',videoId).eq('status','completed').maybeSingle();
-      let entitled=Boolean(purchase);
+      let entitled=owner.user_id===user.id||profile.role==='admin';
+      const {data:purchase}=entitled?{data:null}:await admin.from('purchases').select('id').eq('user_id',user.id).eq('video_id',videoId).eq('status','completed').maybeSingle();
+      entitled=entitled||Boolean(purchase);
       if(!entitled){
         const {data:subscription}=await admin.from('subscriptions').select('plan_tier,current_period_end').eq('user_id',user.id).eq('creator_id',video.creator_id).eq('status','active').maybeSingle();
         const rank:Record<string,number>={free:0,basic:1,vip:2,exclusive:3};
@@ -53,8 +56,6 @@ Deno.serve(async(req)=>{
   };
 
   if(!video.video_url) return response(req,{error:'Media unavailable'},404);
-  const {data:owner}=await admin.from('creators').select('user_id').eq('id',video.creator_id).single();
-  if(!owner?.user_id) return response(req,{error:'Creator not found'},404);
   if(video.video_url.startsWith('storage://')){
     const originalPath=video.video_url.slice('storage://'.length);
     if(!originalPath.startsWith(owner.user_id+'/videos/')) return response(req,{error:'Invalid media ownership'},403);
