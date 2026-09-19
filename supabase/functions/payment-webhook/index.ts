@@ -66,6 +66,12 @@ Deno.serve(async (req) => {
       const videoId=session.reference_id;
       if (creatorId) await admin.rpc('reverse_creator_credit',{p_creator_id:creatorId,p_provider:'mercadopago',p_reference_id:String(paymentId)});
       if (videoId) await admin.from('purchases').update({status:'refunded'}).eq('user_id',session.user_id).eq('video_id',videoId);
+     } else if (session.kind === 'live_solo') {
+      const creatorId=session.metadata?.creator_id, liveId=session.reference_id;
+      if (creatorId && liveId) {
+        await admin.from('live_solo_requests').update({status:'refunded'}).eq('payment_gateway_id',String(paymentId));
+        await admin.rpc('reverse_creator_credit',{p_creator_id:creatorId,p_provider:'mercadopago',p_reference_id:String(paymentId)});
+      }
     } else if (session.kind === 'tip') {
       const creatorId=session.metadata?.creator_id;
       if (creatorId) {
@@ -140,6 +146,20 @@ Deno.serve(async (req) => {
         gross_amount:Number(session.amount),creator_amount:creatorAmount,platform_amount:platformAmount,state:'available',
         provider:'mercadopago',provider_reference:String(paymentId)
       },{onConflict:'provider,provider_reference'});
+    }
+  } else if (session.kind === 'live_solo') {
+    const creatorId=session.metadata?.creator_id, liveId=session.reference_id;
+    if(creatorId && liveId){
+      const {data:live}=await admin.from('live_sessions').select('creator_id,solo_price').eq('id',liveId).single();
+      if(live){
+        const {data:creator}=await admin.from('creators').select('tip_share_percent').eq('id',creatorId).single();
+        const share=Number(creator?.tip_share_percent||90);
+        const creatorAmount=Number((Number(session.amount)*share/100).toFixed(2));
+        const platformAmount=Number((Number(session.amount)-creatorAmount).toFixed(2));
+        await admin.from('live_solo_requests').upsert({live_id:liveId,requester_id:session.user_id,creator_id:creatorId,amount:session.amount,status:'paid',payment_gateway_id:String(paymentId)},{onConflict:'payment_gateway_id'});
+        await admin.rpc('credit_creator',{p_creator_id:creatorId,p_gross:Number(session.amount),p_reference_id:String(paymentId),p_metadata:{provider:'mercadopago',kind:'live_solo',checkout_session_id:sessionId,share_percent:share}});
+        await admin.from('financial_transactions').upsert({user_id:session.user_id,creator_id:creatorId,checkout_session_id:sessionId,kind:'live_solo',gross_amount:Number(session.amount),creator_amount:creatorAmount,platform_amount:platformAmount,state:'available',provider:'mercadopago',provider_reference:String(paymentId)},{onConflict:'provider,provider_reference'});
+      }
     }
   } else if (session.kind === 'tip') {
     const creatorId = session.metadata?.creator_id;
