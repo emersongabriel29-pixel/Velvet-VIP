@@ -54,6 +54,11 @@ Deno.serve(async (req) => {
         await admin.from('creator_subscriptions').update({status:'cancelled'}).eq('user_id',session.user_id).eq('creator_plan_id',session.reference_id);
         await admin.from('subscriptions').update({status:'cancelled'}).eq('user_id',session.user_id).eq('creator_id',plan.creator_id);
       }
+    } else if (session.kind === 'pay_per_view') {
+      const creatorId=session.metadata?.creator_id;
+      const videoId=session.reference_id;
+      if (creatorId) await admin.rpc('reverse_creator_credit',{p_creator_id:creatorId,p_provider:'mercadopago',p_reference_id:String(paymentId)});
+      if (videoId) await admin.from('purchases').update({status:'refunded'}).eq('user_id',session.user_id).eq('video_id',videoId);
     } else if (session.kind === 'tip') {
       const creatorId=session.metadata?.creator_id;
       if (creatorId) {
@@ -65,12 +70,15 @@ Deno.serve(async (req) => {
       const {data:profile}=await admin.from('profiles').select('platform_plan_id').eq('id',session.user_id).maybeSingle();
       if(freePlan?.id && profile?.platform_plan_id===session.reference_id) await admin.from('profiles').update({platform_plan_id:freePlan.id}).eq('id',session.user_id);
     }
+    await admin.from('financial_transactions').update({state:payment.status==='charged_back'?'chargeback':'refunded',updated_at:new Date().toISOString()})
+      .eq('provider','mercadopago').eq('provider_reference',String(paymentId));
     await admin.from('checkout_sessions').update({status:'refunded',updated_at:new Date().toISOString()}).eq('id',sessionId);
     await admin.from('payment_events').update({status:'processed',processed_at:new Date().toISOString()}).eq('gateway','mercadopago').eq('gateway_event_id',eventKey);
     return json({ok:true,status:payment.status});
   }
   if (payment.status !== 'approved') {
-    await admin.from('checkout_sessions').update({ status: 'pending', updated_at: new Date().toISOString() }).eq('id', sessionId);
+    const nextStatus=payment.status==='rejected'?'failed':payment.status==='cancelled'?'cancelled':'pending';
+    await admin.from('checkout_sessions').update({ status: nextStatus, updated_at: new Date().toISOString() }).eq('id', sessionId);
     return json({ ok: true, status: payment.status });
   }
 
@@ -99,6 +107,30 @@ Deno.serve(async (req) => {
       await admin.from('financial_transactions').upsert({
         user_id:session.user_id,creator_id:plan.creator_id,checkout_session_id:sessionId,kind:'subscription',
         gross_amount:Number(plan.price),creator_amount:creatorAmount,platform_amount:platformAmount,state:'available',
+        provider:'mercadopago',provider_reference:String(paymentId)
+      },{onConflict:'provider,provider_reference'});
+    }
+  } else if (session.kind === 'pay_per_view') {
+    const videoId=session.reference_id;
+    const creatorId=session.metadata?.creator_id;
+    if (videoId && creatorId) {
+      const {data:settings}=await admin.from('platform_settings').select('platform_fee_percent').eq('id',true).maybeSingle();
+      const feePercent=Math.min(100,Math.max(0,Number(settings?.platform_fee_percent??15)));
+      const share=100-feePercent;
+      const creatorAmount=Number((Number(session.amount)*share/100).toFixed(2));
+      const platformAmount=Number((Number(session.amount)-creatorAmount).toFixed(2));
+      const paymentMethod=payment.payment_type_id==='credit_card'?'credit_card':'pix';
+      await admin.from('purchases').upsert({
+        user_id:session.user_id,video_id:videoId,creator_id:creatorId,amount:Number(session.amount),
+        payment_method:paymentMethod,status:'completed'
+      },{onConflict:'user_id,video_id'});
+      await admin.rpc('credit_creator',{
+        p_creator_id:creatorId,p_gross:Number(session.amount),p_reference_id:String(paymentId),
+        p_metadata:{provider:'mercadopago',kind:'ppv',checkout_session_id:sessionId,share_percent:share}
+      });
+      await admin.from('financial_transactions').upsert({
+        user_id:session.user_id,creator_id:creatorId,checkout_session_id:sessionId,kind:'ppv',
+        gross_amount:Number(session.amount),creator_amount:creatorAmount,platform_amount:platformAmount,state:'available',
         provider:'mercadopago',provider_reference:String(paymentId)
       },{onConflict:'provider,provider_reference'});
     }

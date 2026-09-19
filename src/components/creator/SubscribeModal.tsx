@@ -79,21 +79,15 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
     if (paymentMethod === 'wallet') { setCheckoutError('Pagamento com saldo ainda não está habilitado para este checkout.'); return; }
     setProcessing(true);
     try {
-      let type: 'subscription' | 'purchase';
-      let itemId: string;
-      if (activeTab === 'ppv' && video) { type='purchase'; itemId=video.id; }
-      else {
-        type='subscription';
-        const {data:plan,error}=await supabase.from('creator_plans').select('id').eq('creator_id',creator.id).eq('tier',selectedPlanTier).eq('billing_period','monthly').eq('is_active',true).limit(1).maybeSingle();
-        if(error || !plan) throw new Error('Plano selecionado não está cadastrado ou está inativo.');
-        const checkout=await startCheckout({kind:'creator_plan',planId:plan.id});
+      if (activeTab === 'ppv' && video) {
+        const checkout=await startCheckout({kind:'pay_per_view',videoId:video.id});
         window.location.assign(checkout.checkoutUrl);
         return;
       }
-      const {data,error}=await supabase.functions.invoke('create-payment-preference',{body:{type,item_id:itemId}});
-      if(error) throw error;
-      if(!data?.checkout_url) throw new Error(data?.error || 'Gateway não retornou o checkout.');
-      window.location.assign(data.checkout_url);
+      const {data:plan,error}=await supabase.from('creator_plans').select('id').eq('creator_id',creator.id).eq('tier',selectedPlanTier).eq('billing_period','monthly').eq('is_active',true).limit(1).maybeSingle();
+      if(error || !plan) throw new Error('Plano selecionado não está cadastrado ou está inativo.');
+      const checkout=await startCheckout({kind:'creator_plan',planId:plan.id});
+      window.location.assign(checkout.checkoutUrl);
     } catch(e:any) { setCheckoutError(e?.message || 'Não foi possível iniciar o pagamento.'); setProcessing(false); }
   };
 

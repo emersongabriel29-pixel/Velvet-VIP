@@ -46,6 +46,21 @@ Deno.serve(async (req) => {
     description = `Assinatura ${plan.name}`;
     referenceId = plan.id;
     metadata.creator_id = plan.creator_id;
+  } else if (kind === 'pay_per_view' && body.videoId) {
+    const { data: video } = await admin.from('videos')
+      .select('id,title,premium_price,is_premium,creator_id,is_removed,is_draft,moderation_status')
+      .eq('id', body.videoId).single();
+    if (!video?.is_premium || video.is_removed || video.is_draft || video.moderation_status !== 'approved' || Number(video.premium_price) <= 0) {
+      return json(req,{ error: 'Vídeo premium indisponível para compra.' }, 400);
+    }
+    const { data: existing } = await admin.from('purchases')
+      .select('id').eq('user_id', user.id).eq('video_id', video.id).eq('status', 'completed').maybeSingle();
+    if (existing) return json(req,{ error: 'Este vídeo já foi comprado.' }, 409);
+    amount = Number(video.premium_price);
+    description = video.title || 'Conteúdo premium Velvet VIP';
+    referenceId = video.id;
+    metadata.creator_id = video.creator_id;
+    metadata.video_id = video.id;
   } else if (kind === 'tip' && body.creatorId) {
     amount = Number(body.amount);
     if (!Number.isFinite(amount) || amount < 1 || amount > 9999) return json(req,{ error: 'Valor de gorjeta inválido.' }, 400);
