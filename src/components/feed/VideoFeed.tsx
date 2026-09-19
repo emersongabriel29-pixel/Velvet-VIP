@@ -9,6 +9,7 @@ import { ReportModal } from './ReportModal';
 import { SubscribeModal } from '../creator/SubscribeModal';
 import { AdBanner } from '../ads/AdBanner';
 import { useAuth } from '../../hooks/useAuth';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface VideoFeedProps {
   currentTab: FeedTab;
@@ -37,13 +38,28 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Load videos based on tab
-  const refreshFeed = () => {
-    const list = dbService.getVideos(currentTab);
+  const refreshFeed = async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      setVideos(dbService.getVideos(currentTab));
+      return;
+    }
+    let query = supabase.from('videos').select('*, creator:creators(*)').eq('is_draft', false).eq('is_removed', false).eq('moderation_status', 'approved').eq('media_status', 'ready');
+    if (currentTab === 'premium') query = query.eq('is_premium', true);
+    if (currentTab === 'foryou') query = query.order('is_premium', { ascending: true }).order('created_at', { ascending: false });
+    else query = query.order('created_at', { ascending: false });
+    const { data, error } = await query.limit(100);
+    if (error) { console.error('feed_load_failed', error.message); setVideos([]); return; }
+    let list = (data || []) as unknown as Video[];
+    if (currentTab === 'following' && currentUser?.id) {
+      const { data: follows } = await supabase.from('follows').select('creator_id').eq('user_id', currentUser.id);
+      const ids = new Set((follows || []).map((x:any) => x.creator_id));
+      list = list.filter((v:any) => ids.has(v.creator_id));
+    }
     setVideos(list);
   };
 
   useEffect(() => {
-    refreshFeed();
+    void refreshFeed();
     setActiveIndex(0);
     if (containerRef.current) {
       containerRef.current.scrollTop = 0;
@@ -52,7 +68,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
 
   useEffect(() => {
     const unsub = dbService.subscribe(() => {
-      refreshFeed();
+      void refreshFeed();
     });
     return unsub;
   }, [currentTab]);
