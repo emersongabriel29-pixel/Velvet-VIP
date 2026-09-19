@@ -8,6 +8,13 @@ const corsFor = (req: Request) => {
   return {'Access-Control-Allow-Origin':allowedOrigins.includes(origin)?origin:'','Vary':'Origin','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'};
 };
 const response=(req:Request,data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{...corsFor(req),'Content-Type':'application/json','Cache-Control': 'no-store'}});
+const bytesToUrl=(bytes:Uint8Array)=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const createPlaybackToken=async(videoId:string,secret:string)=>{
+  const payload=bytesToUrl(new TextEncoder().encode(JSON.stringify({v:videoId,e:Math.floor(Date.now()/1000)+600})));
+  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const signature=new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(payload)));
+  return `${payload}.${bytesToUrl(signature)}`;
+};
 
 Deno.serve(async(req)=>{
   if(req.method==='OPTIONS') return new Response('ok',{headers:corsFor(req)});
@@ -70,7 +77,7 @@ Deno.serve(async(req)=>{
   const original=await resolveRef(video.video_url);
   if(!original) return response(req,{error:'Unmanaged media URL rejected'},403);
 
-  const {data:job}=await admin.from('media_processing_jobs').select('renditions,hls_manifest_path,status').eq('video_id',videoId).eq('status','ready').order('updated_at',{ascending:false}).limit(1).maybeSingle();
+  const {data:job}=await admin.from('media_processing_jobs').select('renditions,hls_manifest_path,archive_manifest_path,status').eq('video_id',videoId).eq('status','ready').order('updated_at',{ascending:false}).limit(1).maybeSingle();
   const raw=Array.isArray(job?.renditions)?job.renditions:[];
   const renditions:any[]=[];
   for(const item of raw){
@@ -83,8 +90,11 @@ Deno.serve(async(req)=>{
   }
   renditions.sort((a,b)=>a.height-b.height);
 
-  const manifestRef=job?.hls_manifest_path||video.hls_manifest_path||video.hls_storage_path;
-  const manifest=manifestRef?await resolveRef(manifestRef):null;
+  const archivedManifest=job?.archive_manifest_path;
+  const legacyManifest=job?.hls_manifest_path||video.hls_manifest_path||video.hls_storage_path;
+  const manifest=archivedManifest
+    ? `${supabaseUrl}/functions/v1/get-hls-playlist?video_id=${encodeURIComponent(videoId)}&token=${encodeURIComponent(await createPlaybackToken(videoId,serviceKey))}`
+    : legacyManifest?await resolveRef(legacyManifest):null;
   const autoUrl=original;
   const sources=[{label:'Automático',height:0,url:original,type:'video/mp4'},...renditions.filter((x,i,a)=>i===a.findIndex(y=>y.label===x.label))];
 

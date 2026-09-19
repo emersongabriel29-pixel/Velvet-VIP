@@ -17,6 +17,10 @@ test('adaptive player uses hls.js when native HLS is unavailable',()=>{
 test('automatic long-video quality prefers the HLS manifest when available',()=>{
   assert.match(media,/adaptive_manifest/);
   assert.match(media,/application\/vnd\.apple\.mpegurl/);
+  const gateway=fs.readFileSync('supabase/functions/get-hls-playlist/index.ts','utf8');
+  assert.match(gateway,/verifyToken/);
+  assert.match(gateway,/createSignedUrls\(paths,22500\)/);
+  assert.doesNotMatch(gateway,/Access-Control-Allow-Origin':\s*'\*'/);
   assert.match(card,/AdaptiveVideo/);
   assert.match(card,/sourceType=\{playbackType\}/);
 });

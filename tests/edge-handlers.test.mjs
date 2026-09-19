@@ -10,7 +10,7 @@ function loadHandler(path, { client, fetch = async () => new Response('{}'), env
   const policy = {};
   vm.runInNewContext(transformSync(fs.readFileSync('supabase/functions/_shared/video-policy.ts','utf8'),{loader:'ts',format:'cjs'}).code,
     {module:policy,exports:policy.exports={}});
-  const context = {module:{exports:{}}, exports:{}, Response, Request, URL, TextEncoder, AbortSignal,
+  const context = {module:{exports:{}}, exports:{}, Response, Request, URL, TextEncoder, TextDecoder, AbortSignal, Blob, atob, btoa,
     crypto:webcrypto, console:{error(){}}, fetch,
     require: name => name.includes('video-policy') ? policy.exports : {createClient:()=>client},
     Deno:{env:{get:key=>env[key]},serve:fn=>{handler=fn;}}};
@@ -71,3 +71,34 @@ test('VIP subscription does not unlock a separate PPV purchase',async()=>{
 test('completed purchase unlocks PPV',async()=>assert.equal((await playback({...published,is_premium:true,access_type:'pay_per_view',required_tier:'vip'},{purchase:{id:'purchase'}})).status,200));
 
 test('unapproved creator cannot distribute even free published content',async()=>assert.equal((await playback(published,{approved:false})).status,404));
+
+async function hlsToken(videoId='video',secret='server'){
+  const payload=Buffer.from(JSON.stringify({v:videoId,e:Math.floor(Date.now()/1000)+600})).toString('base64url');
+  const key=await webcrypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const signature=Buffer.from(await webcrypto.subtle.sign('HMAC',key,new TextEncoder().encode(payload))).toString('base64url');
+  return `${payload}.${signature}`;
+}
+function hlsClient(contents){
+  return {
+    from(){const q={then(resolve){return Promise.resolve({data:{archive_manifest_path:'owner/renditions/video/token/master.m3u8'},error:null}).then(resolve)}};for(const method of ['select','eq','order','limit','maybeSingle'])q[method]=()=>q;return q;},
+    storage:{from:()=>({
+      download:async path=>({data:new Blob([contents[path]||'']),error:contents[path]===undefined?{message:'missing'}:null}),
+      createSignedUrls:async paths=>({data:paths.map((path,index)=>({path,signedUrl:`https://cdn.invalid/segment-${index}.ts?token=signed`})),error:null})
+    })}
+  };
+}
+test('private HLS gateway validates its token and rewrites playlist references',async()=>{
+  const root='owner/renditions/video/token/';
+  const client=hlsClient({
+    [root+'master.m3u8']:'#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1000\n360/index.m3u8\n',
+    [root+'360/index.m3u8']:'#EXTM3U\n#EXTINF:4,\nsegment-00000.ts\n'
+  });
+  const handler=loadHandler('supabase/functions/get-hls-playlist/index.ts',{env:{SUPABASE_URL:'https://project.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'server'},client});
+  const token=await hlsToken();
+  const master=await handler(new Request(`https://project.supabase.co/functions/v1/get-hls-playlist?video_id=video&token=${token}`));
+  assert.equal(master.status,200);assert.match(await master.text(),/get-hls-playlist.*path=360%2Findex\.m3u8/);
+  const variant=await handler(new Request(`https://project.supabase.co/functions/v1/get-hls-playlist?video_id=video&token=${token}&path=360%2Findex.m3u8`));
+  assert.equal(variant.status,200);assert.match(await variant.text(),/https:\/\/cdn\.invalid\/segment-0\.ts\?token=signed/);
+  const denied=await handler(new Request('https://project.supabase.co/functions/v1/get-hls-playlist?video_id=video&token=invalid'));
+  assert.equal(denied.status,401);
+});

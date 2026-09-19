@@ -23,7 +23,7 @@ Verificado em 19/09/2026 contra o repositório (base `667ce08`) e o projeto Supa
 | Upload | Fonte não é apagada se o cadastro existir e o enfileiramento falhar | Worker usa lease, heartbeat, retry e limite de três tentativas |
 | Reprodução | Valida publicação/moderação/processamento; assinatura não libera PPV separado | URLs já emitidas permanecem válidas por até 120 segundos |
 | Mídia | Worker FFmpeg cria ladder sem upscale, MP4, HLS e thumbnail; fila usa `SKIP LOCKED` | Container ainda precisa ser executado em infraestrutura persistente |
-| HLS | Manifesto e segmentos são arquivados no bucket privado | Reprodução usa MP4 assinado até existir gateway/CDN que assine também os segmentos |
+| HLS | Manifesto e segmentos ficam privados; gateway valida token curto e assina segmentos diretamente no Storage | Falta carga longa e validação em aparelhos reais antes de certificar operação |
 | Pagamento | Liquidação atômica, atribuição do acesso ao checkout, reembolso sem revogar recompra posterior | Testes de banco; não transação real no Mercado Pago |
 | Webhook | Confere ID assinado versus pagamento consultado; falhas retornam 503 para retry | Não confirma recebimento quando a liquidação falhou |
 | Dependências | Lockfile npm e `npm ci` nos workflows | Auditoria local: zero vulnerabilidades reportadas |
@@ -39,7 +39,7 @@ Atualizações implantadas nesta revisão: `payment-webhook` v5, `create-checkou
 ## Verificações executadas
 
 - TypeScript e build Vite aprovados.
-- 75 testes Node aprovados, incluindo execução dos handlers HTTP com clientes/provedor simulados e a restrição do banco local ao modo demo.
+- 76 testes Node aprovados, incluindo execução dos handlers HTTP, gateway HLS privado e a restrição do banco local ao modo demo.
 - 2 testes de integração FFmpeg aprovados com fontes reais em paisagem e retrato, validando MP4, playlists e segmentos HLS.
 - `tests/sql/payment-settlement.sql` executado no banco real dentro de transação com ROLLBACK: valor adulterado, aprovação, duplicidade, evento atrasado, reembolso, recompra, falha parcial, retry, assinatura e chargeback.
 - `tests/sql/core-flows.sql` executado no banco real dentro de transação com ROLLBACK: cadastro, papel, idade, aprovação de criador, RLS entre usuários, campos privilegiados, denúncia urgente, fila, lease e preservação da moderação.
@@ -52,7 +52,7 @@ Atualizações implantadas nesta revisão: `payment-webhook` v5, `create-checkou
 | Pendência | O que falta |
 |---|---|
 | Senhas vazadas | Organização no Free; recurso nativo exige Pro ou superior. Nenhum upgrade contratado |
-| Vídeo 360p–4K/HLS | Executar e monitorar o worker em servidor persistente; gateway/CDN para playlists privadas; carga e reprodução longa |
+| Vídeo 360p–4K/HLS | Executar e monitorar o worker em servidor persistente; carga e reprodução longa em aparelhos reais |
 | Lives | Ingestão, distribuição, reconexão, gravação e moderação ao vivo em provedor real |
 | Mercado Pago | Credenciais/ambiente de teste, compra até webhook, concorrência real, recusa e estorno no gateway |
 | Plataforma paga | Vigência/renovação do plano geral ainda precisa de ciclo completo; não há recorrência automática certificada |
