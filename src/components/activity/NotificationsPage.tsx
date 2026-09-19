@@ -24,7 +24,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
 }) => {
   const { isAuthenticated } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [filter, setFilter] = useState<'all' | 'interactions' | 'monetization'>('all');
+
 
   const loadNotifications = () => {
     setNotifications(isAuthenticated ? dbService.getNotifications() : []);
@@ -49,15 +49,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
     loadNotifications();
   };
 
-  const filtered = notifications.filter((n) => {
-    if (filter === 'interactions') {
-      return n.type === 'like' || n.type === 'comment' || n.type === 'follow';
-    }
-    if (filter === 'monetization') {
-      return n.type === 'subscription' || n.type === 'purchase' || n.type === 'payout';
-    }
-    return true;
-  });
+  const filtered = notifications;
 
   const getIcon = (type: Notification['type']) => {
     switch (type) {
@@ -73,6 +65,9 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
         return <DollarSign className="w-4 h-4 text-amber-300" />;
       case 'payout':
         return <CheckCircle2 className="w-4 h-4 text-emerald-400" />;
+      case 'new_content':
+      case 'new_creator':
+        return <Bell className="w-4 h-4 text-rose-400" />;
       default:
         return <Bell className="w-4 h-4 text-rose-400" />;
     }
@@ -96,49 +91,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
         </button>}
       </div>
 
-      {/* Filter Tabs */}
-      {isAuthenticated ? (
-      <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1">
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-            filter === 'all'
-              ? 'bg-rose-600 text-white'
-              : 'bg-zinc-900 text-zinc-400 hover:text-white'
-          }`}
-        >
-          Todas ({notifications.length})
-        </button>
-
-        <button
-          onClick={() => setFilter('interactions')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-            filter === 'interactions'
-              ? 'bg-rose-600 text-white'
-              : 'bg-zinc-900 text-zinc-400 hover:text-white'
-          }`}
-        >
-          Interações
-        </button>
-
-        <button
-          onClick={() => setFilter('monetization')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-            filter === 'monetization'
-              ? 'bg-gradient-to-r from-amber-600 to-rose-600 text-white'
-              : 'bg-zinc-900 text-zinc-400 hover:text-white'
-          }`}
-        >
-          Monetização
-        </button>
-      </div>
-      ) : (
-        <div className="mb-4 flex gap-2">
-          <span className="rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-bold text-white">Para você</span>
-          <span className="rounded-xl bg-zinc-900 px-3.5 py-1.5 text-xs font-bold text-zinc-400">Novidades</span>
-        </div>
-      )}
-
+      {/* Unified notification stream: no choice between content/creators. */}
       {/* Notifications List */}
       {!isAuthenticated && (
         <div className="mb-4 grid gap-3 sm:grid-cols-2">
