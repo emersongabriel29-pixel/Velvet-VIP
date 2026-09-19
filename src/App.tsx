@@ -39,6 +39,7 @@ const VelvetVipApp: React.FC = () => {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [lgpdModalOpen, setLgpdModalOpen] = useState(false);
   const [productTool, setProductTool] = useState<ProductTool>('search');
+  const [initialLiveId, setInitialLiveId] = useState<string | undefined>(undefined);
 
   useEffect(()=>{
     const syncHash=()=>{
@@ -50,6 +51,7 @@ const VelvetVipApp: React.FC = () => {
     return()=>window.removeEventListener('hashchange',syncHash);
   },[]);
 
+  useEffect(()=>{ const handler=(event:Event)=>{ const id=(event as CustomEvent<string>).detail; setInitialLiveId(id); setActiveView('live'); }; window.addEventListener('velvet:open-live',handler); return()=>window.removeEventListener('velvet:open-live',handler); },[]);
   const handleSelectCreator = (creatorId: string) => { setSelectedCreatorId(creatorId); window.history.replaceState(null,'',`#creator=${creatorId}`); setActiveView('profile'); };
   const handleSelectVideo = (_videoId: string) => { setActiveView('feed'); };
   const handleOpenProfile = () => { setSelectedCreatorId(undefined); if(window.location.hash.startsWith('#creator=')) window.history.replaceState(null,'',window.location.pathname+window.location.search); setActiveView('profile'); };
@@ -65,7 +67,7 @@ const VelvetVipApp: React.FC = () => {
       {activeView === 'creator_studio' && <CreatorDashboard onOpenUpload={() => setCreateHubOpen(true)} onSelectVideo={handleSelectVideo} />}
       {activeView === 'purchases' && <MyPurchasesPage onSelectVideo={handleSelectVideo} onBack={() => setActiveView('profile')} />}
       {activeView === 'admin' && <AdminCommandCenter onSelectVideo={handleSelectVideo} />}
-      {activeView === 'live' && <LivePage onBack={() => setActiveView('feed')} />}
+      {activeView === 'live' && <LivePage initialLiveId={initialLiveId} onBack={() => { setInitialLiveId(undefined); setActiveView('feed'); }} />}
       {activeView === 'live_studio' && <LiveStudio onBack={() => setActiveView('creator_studio')} onOpenLives={() => setActiveView('live')} />}
       {activeView === 'community' && <CommunityPage onBack={() => setActiveView('feed')} />}
       {activeView === 'more' && <ProductHub onOpen={(tool) => { setProductTool(tool); setActiveView('product_tool'); }} />}
