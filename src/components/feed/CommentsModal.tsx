@@ -3,7 +3,7 @@ import { X, Send, Heart, MessageSquare, Loader2 } from 'lucide-react';
 import { Comment } from '../../types';
 import { dbService } from '../../services/db';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isDemoMode } from '../../lib/supabase';
 import { getProfileImageUrl } from '../../services/media';
 
 interface CommentsModalProps {
@@ -28,10 +28,11 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({ videoId, videoTitl
     (async()=>{
       setLoading(true); setError('');
       try{
-        if(!isSupabaseConfigured || !supabase){
+        if(isDemoMode){
           if(!cancelled) setComments(dbService.getComments(videoId));
           return;
         }
+        if(!supabase) throw new Error('Backend de produção indisponível.');
         const {data:rows,error:commentsError}=await supabase.from('comments')
           .select('id,video_id,user_id,content,likes_count,created_at,moderation_status')
           .eq('video_id',videoId)
@@ -64,7 +65,7 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({ videoId, videoTitl
   }, [isOpen, videoId, isAuthenticated, currentUser.id]);
 
   const handleLike = async (comment: Comment) => {
-    if (!isAuthenticated || !currentUser.id || !isSupabaseConfigured || !supabase) return;
+    if (!isAuthenticated || !currentUser.id || isDemoMode) return;
     const liked = likedIds.has(comment.id);
     setLikedIds(prev => { const n=new Set(prev); liked?n.delete(comment.id):n.add(comment.id); return n; });
     setComments(prev => prev.map(x => x.id===comment.id ? {...x, likes_count: Math.max(0,(x.likes_count||0)+(liked?-1:1))} : x));
@@ -82,10 +83,11 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({ videoId, videoTitl
     if (!content || !isAuthenticated) return;
     setSubmitting(true); setError('');
     try{
-      if(!isSupabaseConfigured || !supabase){
+      if(isDemoMode){
         const newC=dbService.addComment(videoId,content);
         setComments(prev=>[newC,...prev]);
       }else{
+        if(!supabase) throw new Error('Backend de produção indisponível.');
         const {data,error:insertError}=await supabase.from('comments').insert({video_id:videoId,user_id:currentUser.id,content}).select('id,video_id,user_id,content,likes_count,created_at').single();
         if(insertError||!data) throw insertError||new Error('Comentário não registrado.');
         const avatar=await getProfileImageUrl(currentUser.avatar_url||'');

@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { X, Upload, Film, CheckCircle2, Sparkles, Image, Lock, Globe, Users } from 'lucide-react';
 import { dbService } from '../../services/db';
-import { isSupabaseConfigured } from '../../lib/supabase';
+import { isDemoMode, isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { uploadCreatorVideo } from '../../services/media';
 
 interface UploadModalProps {
@@ -39,8 +39,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
   const [thumbnailUrl, setThumbnailUrl] = useState(SAMPLE_PRESET_VIDEOS[0].thumb);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const systemCategories = dbService.getCategories();
-  const [category, setCategory] = useState(systemCategories[0]?.name || 'Glamour & Lifestyle');
+  const [categories,setCategories]=useState<string[]>([]);
+  const [category, setCategory] = useState('');
   const [hashtagsStr, setHashtagsStr] = useState('velvetvip, bastidores, exclusivo');
   const [accessType, setAccessType] = useState<'public' | 'followers' | 'premium'>('public');
   const [premiumPrice, setPremiumPrice] = useState(19.90);
@@ -58,6 +58,26 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(()=>{
+    if(!isOpen) return;
+    let cancelled=false;
+    (async()=>{
+      try{
+        if(isDemoMode){
+          const names=dbService.getCategories().map(c=>c.name);
+          if(!cancelled){setCategories(names);setCategory(v=>v||names[0]||'Glamour & Lifestyle');}
+          return;
+        }
+        if(!supabase) throw new Error('Backend de produção indisponível.');
+        const {data,error}=await supabase.from('system_categories').select('name').eq('is_active',true).order('sort_order');
+        if(error) throw error;
+        const names=(data||[]).map((row:any)=>row.name);
+        if(!cancelled){setCategories(names);setCategory(v=>v||names[0]||'');}
+      }catch(err:any){if(!cancelled)setUploadError(err?.message||'Não foi possível carregar as categorias.');}
+    })();
+    return()=>{cancelled=true};
+  },[isOpen]);
 
   if (!isOpen) return null;
 
@@ -125,7 +145,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
           accessType:accessType==='public'?'free':accessType==='followers'?'subscription':'pay_per_view'
         });
         setUploadProgress(100);
-      } else {
+      } else if (isDemoMode) {
         dbService.uploadVideo({
           title:title.trim(),description:description.trim(),video_url:videoUrl,thumbnail_url:thumbnailUrl,
           category,hashtags:tags,is_premium:accessType==='premium',
@@ -133,6 +153,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
           required_tier:accessType==='premium'?requiredTier:'free',is_draft:asDraft,content_kind:mode as 'short' | 'long'
         });
         setUploadProgress(100);
+      } else {
+        throw new Error('Backend de produção indisponível.');
       }
       setUploadSuccess(true);
       setTimeout(()=>{setUploadSuccess(false);onClose();onSuccess?.();},900);
@@ -168,7 +190,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
               {isDraft ? 'Salvo como Rascunho!' : 'Vídeo Publicado com Sucesso!'}
             </h4>
             <p className="text-xs text-zinc-400">
-              {mode === 'long' ? 'Seu vídeo longo foi publicado e ficará disponível no perfil do criador.' : 'Seu conteúdo já está processado e disponível no feed dos seus seguidores e assinantes.'}
+              {mode === 'long' ? 'Upload concluído. O vídeo longo aguarda transcodificação HLS e moderação antes de ficar disponível.' : 'Upload concluído. O conteúdo aguarda moderação antes de aparecer para outros usuários.'}
             </p>
           </div>
         ) : isUploading ? (
@@ -299,7 +321,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
                     onChange={(e) => setCategory(e.target.value)}
                     className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-xs text-white focus:outline-none focus:border-rose-500"
                   >
-                    {systemCategories.map((cat) => (
+                    {categories.map((cat) => (
                       <option key={cat.id} value={cat.name}>
                         {cat.name}
                       </option>

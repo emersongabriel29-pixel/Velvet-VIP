@@ -5,6 +5,18 @@ const allowedHosts=new Set((Deno.env.get('STREAMING_ALLOWED_HOSTS')||'').split('
 const cors=(req:Request)=>{const origin=req.headers.get('Origin')||'';return {'Access-Control-Allow-Origin':allowedOrigins.includes(origin)?origin:'','Vary':'Origin','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'}};
 const json=(req:Request,data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{...cors(req),'Content-Type':'application/json','Cache-Control':'no-store'}});
 const safeUrl=(value:unknown)=>{if(typeof value!=='string'||!value)return null;try{const u=new URL(value);return u.protocol==='https:'&&allowedHosts.has(u.hostname.toLowerCase())?value:null}catch{return null}};
+const signCloudflare=async(ref:string,roomId:string)=>{
+  const accountId=Deno.env.get('CLOUDFLARE_ACCOUNT_ID'),apiToken=Deno.env.get('CLOUDFLARE_STREAM_API_TOKEN');
+  if(!accountId||!apiToken)return null;
+  const tokenRes=await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/${encodeURIComponent(roomId)}/token`,{
+    method:'POST',headers:{Authorization:`Bearer ${apiToken}`,'Content-Type':'application/json'},
+    body:JSON.stringify({exp:Math.floor(Date.now()/1000)+300})
+  });
+  const tokenBody=await tokenRes.json().catch(()=>null),token=tokenBody?.result?.token;
+  if(!tokenRes.ok||!tokenBody?.success||!token)return null;
+  const safe=safeUrl(ref);if(!safe)return null;
+  const u=new URL(safe);u.pathname=u.pathname.replace(`/${roomId}/`,`/${token}/`);return u.toString();
+};
 
 Deno.serve(async(req)=>{
   if(req.method==='OPTIONS')return new Response('ok',{headers:cors(req)});
@@ -44,7 +56,11 @@ Deno.serve(async(req)=>{
   if(stateError||!state)return json(req,{error:'Streaming provider not attached'},409);
 
   const sources:any[]=[];
-  const ref=safeUrl(state.playback_reference);
+  const rawRef=safeUrl(state.playback_reference);
+  const ref=state.provider==='cloudflare'&&rawRef&&state.room_id
+    ? await signCloudflare(rawRef,state.room_id)
+    : rawRef;
+  if(state.provider==='cloudflare'&&rawRef&&!ref)return json(req,{error:'Secure live playback unavailable'},503);
   if(ref)sources.push({label:'Automático',url:ref,type:'application/vnd.apple.mpegurl'});
   for(const item of Array.isArray(state.playback_sources)?state.playback_sources:[]){
     const source=safeUrl(item?.url||item?.playback_reference);

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Check, Gift, Crown, Megaphone, ArrowLeft, Loader2, ExternalLink } from 'lucide-react';
 import { PlatformPlan } from '../../types';
 import { dbService } from '../../services/db';
-import { isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { isDemoMode, isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { startCheckout } from '../../services/payments';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -22,8 +22,10 @@ export const MonetizationPage: React.FC<{ onBack: () => void }> = ({ onBack }) =
           const { data, error } = await supabase.from('platform_plans').select('*').eq('is_active', true).order('monthly_price');
           if (error) throw error;
           if (mounted && data) setPlans(data as PlatformPlan[]);
-        } else if (mounted) {
+        } else if (isDemoMode && mounted) {
           setPlans(dbService.getPlatformPlans().map(p => ({ ...p, created_at: new Date().toISOString() })));
+        } else {
+          throw new Error('Backend de produção indisponível.');
         }
       } catch (error: any) {
         if (mounted) setFeedback(error.message || 'Não foi possível carregar os planos.');

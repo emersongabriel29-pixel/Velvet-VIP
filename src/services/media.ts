@@ -21,8 +21,9 @@ export async function uploadCreatorVideo(input:{
   const restricted=await supabase.rpc('has_active_restriction',{p_scope:'publish'});
   if(restricted.error) throw new Error('Não foi possível validar a permissão de publicação.');
   if(restricted.data===true) throw new Error('Sua conta está temporariamente impedida de publicar.');
-  const {data:creator,error:creatorError}=await supabase.from('creators').select('id,is_approved').eq('user_id',user.id).single();
+  const {data:creator,error:creatorError}=await supabase.from('creators').select('id,is_approved,identity_status,content_rights_confirmed').eq('user_id',user.id).single();
   if(creatorError||!creator?.is_approved) throw new Error('Somente criadores aprovados podem publicar.');
+  if(creator.identity_status!=='verified'||creator.content_rights_confirmed!==true) throw new Error('Conclua a verificação de identidade e direitos do conteúdo antes de publicar.');
 
   const mediaId=crypto.randomUUID();
   const videoPath=`${user.id}/videos/${mediaId}.${safeExt(input.file)}`;
@@ -46,12 +47,15 @@ export async function uploadCreatorVideo(input:{
       required_tier:input.isPremium?input.requiredTier:'free',
       category:input.category,hashtags:input.hashtags,is_draft:input.isDraft,
       access_type:input.accessType,content_level:'sensual',anonymous_access:input.anonymousAccess,
-      source_storage_path:videoPath,media_status:'ready',processing_status:input.contentKind==='long'?'queued':'ready'
+      source_storage_path:videoPath,media_status:input.contentKind==='long'?'processing':'ready',processing_status:input.contentKind==='long'?'queued':'ready'
     }).select('id').single();
     if(inserted.error||!inserted.data) throw new Error(inserted.error?.message||'Falha ao registrar o vídeo.');
     if(input.contentKind==='long'){
       const queued=await supabase.rpc('enqueue_media_processing',{p_video_id:inserted.data.id,p_source_path:videoPath});
       if(queued.error) throw new Error('O vídeo foi enviado, mas não foi possível enfileirar o processamento.');
+      // Best effort: if a concrete provider is configured the Edge adapter starts encoding.
+      // A missing provider does not destroy the safely queued upload.
+      await supabase.functions.invoke('start-media-processing',{body:{video_id:inserted.data.id}}).catch(()=>null);
     }
     return {id:inserted.data.id,storagePath:videoPath};
   }catch(err){
@@ -125,4 +129,12 @@ export async function getProfileImageUrl(ref:string):Promise<string>{
   const path=ref.slice('storage://'.length);
   const {data,error}=await supabase.storage.from('velvet-media').createSignedUrl(path,3600);
   return error ? '' : data.signedUrl;
+}
+
+
+export async function syncLongVideoProcessing(videoId:string){
+  if(!supabase) throw new Error('Supabase não configurado.');
+  const {data,error}=await supabase.functions.invoke('sync-media-processing',{body:{video_id:videoId}});
+  if(error) throw error;
+  return data;
 }

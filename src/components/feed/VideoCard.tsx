@@ -18,7 +18,7 @@ import {
 import { Video } from '../../types';
 import { dbService } from '../../services/db';
 import { getVideoPlaybackOptions, PlaybackSource } from '../../services/media';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured, isDemoMode } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { AdaptiveVideo } from '../common/AdaptiveVideo';
 
@@ -62,6 +62,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [playbackSources,setPlaybackSources]=useState<PlaybackSource[]>([]);
   const [playbackUrl, setPlaybackUrl] = useState(video.video_url.startsWith('storage://') ? '' : video.video_url);
   const [playbackType,setPlaybackType]=useState('video/mp4');
+  const [hlsQualities,setHlsQualities]=useState<number[]>([]);
+  const [qualityHeight,setQualityHeight]=useState<number|null>(null);
   const lastTapRef = useRef<number>(0);
   const canPlayback = !video.is_premium || Boolean(video.has_unlocked);
   const isLocked = video.is_premium && !video.has_unlocked;
@@ -69,7 +71,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   useEffect(() => {
     let cancelled=false;
     (async()=>{
-      if(!isSupabaseConfigured || !supabase){
+      if(isDemoMode){
         if(!cancelled){
           setIsFollowing(video.creator_id?dbService.isFollowing(video.creator_id):false);
           setHasLiked(Boolean(video.has_liked));
@@ -101,6 +103,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     setQuality('Automático');
     setPlaybackUrl(video.video_url.startsWith('storage://') ? '' : video.video_url);
     setPlaybackType('video/mp4');
+    setHlsQualities([]);
+    setQualityHeight(null);
     if (video.video_url.startsWith('storage://') && canPlayback) {
       getVideoPlaybackOptions(video.id).then(data=>{
         if(cancelled)return;
@@ -130,9 +134,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             setIsPlaying(false);
           });
       }
-      if(isSupabaseConfigured && supabase){
+      if(supabase){
         if(isAuthenticated) void supabase.rpc('record_video_view',{p_video_id:video.id,p_duration_seconds:0});
-      }else dbService.recordView(video.id);
+      }else if(isDemoMode) dbService.recordView(video.id);
     } else {
       el.pause();
       setIsPlaying(false);
@@ -187,7 +191,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   const handleLike = async () => {
-    if(!isSupabaseConfigured || !supabase){
+    if(isDemoMode){
       const res=dbService.toggleLike(video.id);setHasLiked(res.hasLiked);setLikesCount(res.count);return;
     }
     if(!isAuthenticated)return;
@@ -199,7 +203,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   const handleFavorite = async () => {
-    if(!isSupabaseConfigured || !supabase){setHasFavorited(dbService.toggleFavorite(video.id));return;}
+    if(isDemoMode){setHasFavorited(dbService.toggleFavorite(video.id));return;}
     if(!isAuthenticated)return;
     const previous=hasFavorited;setHasFavorited(!previous);
     const {data,error}=await supabase.rpc('toggle_video_favorite',{p_video_id:video.id});
@@ -209,7 +213,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const handleToggleFollow = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!video.creator_id) return;
-    if(!isSupabaseConfigured || !supabase){setIsFollowing(dbService.toggleFollow(video.creator_id));return;}
+    if(isDemoMode){setIsFollowing(dbService.toggleFollow(video.creator_id));return;}
     if(!isAuthenticated)return;
     const previous=isFollowing;setIsFollowing(!previous);
     const {data,error}=await supabase.rpc('toggle_creator_follow',{p_creator_id:video.creator_id});
@@ -227,6 +231,16 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     }
   };
 
+  const automaticSource=playbackSources.find(source=>source.label==='Automático')||playbackSources[0];
+  const manualSources=playbackSources.filter(source=>source.label!=='Automático'&&!String(source.type).toLowerCase().includes('mpegurl'));
+  const showQualitySelector=hlsQualities.length>0||manualSources.length>0;
+  const selectAutomatic=()=>{
+    setQuality('Automático');setQualityHeight(null);
+    if(automaticSource){setPlaybackUrl(automaticSource.url);setPlaybackType(automaticSource.type);}
+    setShowQuality(false);
+  };
+  const selectHlsQuality=(height:number)=>{setQuality(`${height}p`);setQualityHeight(height);setShowQuality(false);};
+
   return (
     <div
       id={`video-slide-${video.id}`}
@@ -241,6 +255,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           ref={videoRef}
           sourceUrl={playbackUrl || undefined}
           sourceType={playbackType}
+          qualityHeight={qualityHeight}
+          onQualities={setHlsQualities}
           poster={video.thumbnail_url}
           loop
           playsInline
@@ -251,7 +267,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           }`}
         />
 
-        {(video.content_kind === 'long' || video.duration_seconds >= 60) && <div className="absolute top-16 sm:top-4 left-4 z-30 flex items-center gap-2"><div className="rounded-lg bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-md">PRÉVIA • 15s • VÍDEO LONGO</div>{playbackSources.length>1&&<div className="relative"><button onClick={(e)=>{e.stopPropagation();setShowQuality(v=>!v)}} className="rounded-lg bg-black/60 p-1.5 text-white backdrop-blur-md" title="Qualidade"><Settings className="h-3.5 w-3.5"/></button>{showQuality&&<div onClick={e=>e.stopPropagation()} className="absolute left-0 mt-1 w-32 rounded-xl border border-white/10 bg-black/95 p-1 shadow-xl">{playbackSources.map(src=><button key={src.label} onClick={()=>{setQuality(src.label);setPlaybackUrl(src.url);setPlaybackType(src.type);setShowQuality(false)}} className={`block w-full rounded-lg px-2 py-1.5 text-left text-[10px] ${quality===src.label?'bg-rose-600 text-white':'text-zinc-300 hover:bg-white/10'}`}>{src.label}</button>)}</div>}</div>}</div>}
+        {(video.content_kind === 'long' || video.duration_seconds >= 60) && <div className="absolute top-16 sm:top-4 left-4 z-30 flex items-center gap-2"><div className="rounded-lg bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-md">PRÉVIA • 15s • VÍDEO LONGO</div>{showQualitySelector&&<div className="relative"><button onClick={(e)=>{e.stopPropagation();setShowQuality(v=>!v)}} className="rounded-lg bg-black/60 p-1.5 text-white backdrop-blur-md" title="Qualidade"><Settings className="h-3.5 w-3.5"/></button>{showQuality&&<div onClick={e=>e.stopPropagation()} className="absolute left-0 mt-1 w-32 rounded-xl border border-white/10 bg-black/95 p-1 shadow-xl"><button onClick={selectAutomatic} className={`block w-full rounded-lg px-2 py-1.5 text-left text-[10px] ${quality==='Automático'?'bg-rose-600 text-white':'text-zinc-300 hover:bg-white/10'}`}>Automático</button>{hlsQualities.map(height=><button key={height} onClick={()=>selectHlsQuality(height)} className={`block w-full rounded-lg px-2 py-1.5 text-left text-[10px] ${quality===height+'p'?'bg-rose-600 text-white':'text-zinc-300 hover:bg-white/10'}`}>{height}p</button>)}{manualSources.map(src=><button key={src.label+src.url} onClick={()=>{setQuality(src.label);setQualityHeight(null);setPlaybackUrl(src.url);setPlaybackType(src.type);setShowQuality(false)}} className={`block w-full rounded-lg px-2 py-1.5 text-left text-[10px] ${quality===src.label?'bg-rose-600 text-white':'text-zinc-300 hover:bg-white/10'}`}>{src.label}</button>)}</div>}</div>}</div>}
 
         {/* Double-tap heart burst animation */}
         {showHeartBurst && (

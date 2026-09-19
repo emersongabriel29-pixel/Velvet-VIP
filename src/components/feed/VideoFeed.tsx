@@ -9,7 +9,7 @@ import { ReportModal } from './ReportModal';
 import { SubscribeModal } from '../creator/SubscribeModal';
 import { AdBanner } from '../ads/AdBanner';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured, isDemoMode } from '../../lib/supabase';
 import { resolvePrivateMediaRefs } from '../../services/media';
 
 interface VideoFeedProps {
@@ -29,6 +29,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
   const [videos, setVideos] = useState<Video[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
+  const [error, setError] = useState('');
 
   // Modals state
   const [selectedVideoForComments, setSelectedVideoForComments] = useState<Video | null>(null);
@@ -40,16 +41,18 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
 
   // Load videos based on tab
   const refreshFeed = async () => {
-    if (!isSupabaseConfigured || !supabase) {
+    setError('');
+    if (isDemoMode) {
       setVideos(dbService.getVideos(currentTab));
       return;
     }
+    if (!supabase) { setVideos([]); setError('Backend de produção indisponível.'); return; }
     let query = supabase.from('videos').select('*, creator:creators(*)').eq('is_draft', false).eq('is_removed', false).eq('moderation_status', 'approved').eq('media_status', 'ready');
     if (currentTab === 'premium') query = query.eq('is_premium', true);
     if (currentTab === 'foryou') query = query.order('is_premium', { ascending: true }).order('created_at', { ascending: false });
     else query = query.order('created_at', { ascending: false });
     const { data, error } = await query.limit(100);
-    if (error) { console.error('feed_load_failed', error.message); setVideos([]); return; }
+    if (error) { console.error('feed_load_failed', error.message); setError(error.message); setVideos([]); return; }
     let list = (data || []) as unknown as Video[];
     const {data:{user}}=await supabase.auth.getUser();
 
@@ -110,7 +113,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
   }, [currentTab]);
 
   useEffect(() => {
-    if(isSupabaseConfigured) return;
+    if(!isDemoMode) return;
     const unsub = dbService.subscribe(() => { void refreshFeed(); });
     return unsub;
   }, [currentTab]);
@@ -200,6 +203,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
       >
         {videos.length === 0 ? (
           <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 text-zinc-400 max-w-sm mx-auto">
+            {error && <p role="alert" className="mb-4 rounded-xl border border-rose-500/30 bg-rose-950/20 p-3 text-xs text-rose-200">{error}</p>}
             <div className="w-16 h-16 rounded-full bg-rose-950/40 border border-rose-500/30 flex items-center justify-center text-rose-500 mb-4">
               <Filter className="w-8 h-8" />
             </div>
