@@ -1,65 +1,85 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') || '').split(',').map(v => v.trim()).filter(Boolean);
+const allowedStreamingHosts = new Set((Deno.env.get('STREAMING_ALLOWED_HOSTS') || '').split(',').map(v=>v.trim().toLowerCase()).filter(Boolean));
 const corsFor = (req: Request) => {
-  const origin = req.headers.get('Origin') || '';
-  const allowed = allowedOrigins.includes(origin) ? origin : '';
-  return { 'Access-Control-Allow-Origin': allowed, 'Vary': 'Origin', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
+  const origin=req.headers.get('Origin')||'';
+  return {'Access-Control-Allow-Origin':allowedOrigins.includes(origin)?origin:'','Vary':'Origin','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'};
 };
-const response = (req: Request, data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...corsFor(req), 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+const response=(req:Request,data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{...corsFor(req),'Content-Type':'application/json','Cache-Control': 'no-store'}});
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsFor(req) });
-  if (req.method !== 'POST') return response(req, { error: 'Method not allowed' }, 405);
-  const supabaseUrl = Deno.env.get('SUPABASE_URL'), serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!supabaseUrl || !serviceKey) return response(req, { error: 'Server not configured' }, 500);
-  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-  const body = await req.json().catch(() => null);
-  const videoId = body?.video_id;
-  if (typeof videoId !== 'string') return response(req, { error: 'video_id required' }, 400);
+Deno.serve(async(req)=>{
+  if(req.method==='OPTIONS') return new Response('ok',{headers:corsFor(req)});
+  if(req.method!=='POST') return response(req,{error:'Method not allowed'},405);
+  const supabaseUrl=Deno.env.get('SUPABASE_URL'),serviceKey=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if(!supabaseUrl||!serviceKey) return response(req,{error:'Server not configured'},500);
+  const admin=createClient(supabaseUrl,serviceKey,{auth:{persistSession:false}});
+  const body=await req.json().catch(()=>null);
+  const videoId=body?.video_id;
+  if(typeof videoId!=='string') return response(req,{error:'video_id required'},400);
 
-  const { data: video } = await admin.from('videos')
-    .select('id,video_url,is_premium,creator_id,required_tier,access_type,content_level,anonymous_access,moderation_status,media_status,is_draft,is_removed')
-    .eq('id', videoId).single();
-  if (!video) return response(req, { error: 'Video not found' }, 404);
+  const {data:video}=await admin.from('videos').select('id,video_url,is_premium,creator_id,required_tier,access_type,content_level,anonymous_access,moderation_status,media_status,is_draft,is_removed,hls_manifest_path,hls_storage_path').eq('id',videoId).single();
+  if(!video) return response(req,{error:'Video not found'},404);
 
-  const anonymousAllowed =
-    video.anonymous_access === true &&
-    video.is_premium === false &&
-    video.access_type === 'free' &&
-    video.required_tier === 'free' &&
-    video.content_level === 'sensual' &&
-    video.moderation_status === 'approved' &&
-    video.media_status === 'ready' &&
-    video.is_draft === false &&
-    video.is_removed === false;
-
-  if (!anonymousAllowed) {
-    const auth = req.headers.get('Authorization');
-    if (!auth?.startsWith('Bearer ')) return response(req, { error: 'Authentication required' }, 401);
-    const { data: { user }, error: authError } = await admin.auth.getUser(auth.slice(7));
-    if (authError || !user) return response(req, { error: 'Invalid session' }, 401);
-    const { data: profile } = await admin.from('profiles').select('age_verified,birth_date,is_blocked,is_suspended').eq('id', user.id).single();
-    if (!profile?.age_verified || profile.is_blocked || profile.is_suspended || !profile.birth_date ||
-        new Date(profile.birth_date) > new Date(new Date().setFullYear(new Date().getFullYear() - 18))) {
-      return response(req, { error: '18+ verification required' }, 403);
-    }
-    if (video.is_premium) {
-      const { data: purchase } = await admin.from('purchases').select('id').eq('user_id', user.id).eq('video_id', videoId).eq('status', 'completed').maybeSingle();
-      let entitled = Boolean(purchase);
-      if (!entitled) {
-        const { data: subscription } = await admin.from('subscriptions').select('plan_tier,current_period_end').eq('user_id', user.id).eq('creator_id', video.creator_id).eq('status', 'active').maybeSingle();
-        const rank: Record<string, number> = { free: 0, basic: 1, vip: 2, exclusive: 3 };
-        entitled = Boolean(subscription && new Date(subscription.current_period_end) > new Date() && rank[subscription.plan_tier] >= rank[video.required_tier || 'vip']);
+  const {data:owner}=await admin.from('creators').select('user_id').eq('id',video.creator_id).single();
+  if(!owner?.user_id) return response(req,{error:'Creator not found'},404);
+  const anonymousAllowed=video.anonymous_access===true&&video.is_premium===false&&video.access_type==='free'&&video.required_tier==='free'&&video.content_level==='sensual'&&video.moderation_status==='approved'&&video.media_status==='ready'&&video.is_draft===false&&video.is_removed===false;
+  if(!anonymousAllowed){
+    const auth=req.headers.get('Authorization');
+    if(!auth?.startsWith('Bearer ')) return response(req,{error:'Authentication required'},401);
+    const {data:{user},error:authError}=await admin.auth.getUser(auth.slice(7));
+    if(authError||!user) return response(req,{error:'Invalid session'},401);
+    const {data:profile}=await admin.from('profiles').select('age_verified,birth_date,is_blocked,is_suspended,role').eq('id',user.id).single();
+    if(!profile?.age_verified||profile.is_blocked||profile.is_suspended||!profile.birth_date||new Date(profile.birth_date)>new Date(new Date().setFullYear(new Date().getFullYear()-18))) return response(req,{error:'18+ verification required'},403);
+    if(video.is_premium){
+      let entitled=owner.user_id===user.id||profile.role==='admin';
+      const {data:purchase}=entitled?{data:null}:await admin.from('purchases').select('id').eq('user_id',user.id).eq('video_id',videoId).eq('status','completed').maybeSingle();
+      entitled=entitled||Boolean(purchase);
+      if(!entitled){
+        const {data:subscription}=await admin.from('subscriptions').select('plan_tier,current_period_end').eq('user_id',user.id).eq('creator_id',video.creator_id).eq('status','active').maybeSingle();
+        const rank:Record<string,number>={free:0,basic:1,vip:2,exclusive:3};
+        entitled=Boolean(subscription&&new Date(subscription.current_period_end)>new Date()&&rank[subscription.plan_tier]>=rank[video.required_tier||'vip']);
       }
-      if (!entitled) return response(req, { error: 'Premium access required' }, 403);
+      if(!entitled) return response(req,{error:'Premium access required'},403);
     }
   }
 
-  if (!video.video_url) return response(req, { error: 'Media unavailable' }, 404);
-  if (!video.video_url.startsWith('storage://')) return response(req, { error: 'Unmanaged media URL rejected' }, 403);
-  const path = video.video_url.slice('storage://'.length);
-  const { data, error } = await admin.storage.from('velvet-media').createSignedUrl(path, 120);
-  if (error || !data?.signedUrl) return response(req, { error: 'Could not create signed URL' }, 500);
-  return response(req, { url: data.signedUrl, expires_in: 120, anonymous: anonymousAllowed });
+  const resolveRef=async(ref:unknown)=>{
+    if(typeof ref!=='string'||!ref) return null;
+    if(ref.startsWith('https://')){
+      try{const u=new URL(ref);return allowedStreamingHosts.has(u.hostname.toLowerCase())?ref:null;}catch{return null;}
+    }
+    const path=ref.startsWith('storage://')?ref.slice('storage://'.length):ref;
+    if(path.includes('..')||path.startsWith('/')) return null;
+    const {data,error}=await admin.storage.from('velvet-media').createSignedUrl(path,120);
+    return error||!data?.signedUrl?null:data.signedUrl;
+  };
+
+  if(!video.video_url) return response(req,{error:'Media unavailable'},404);
+  if(video.video_url.startsWith('storage://')){
+    const originalPath=video.video_url.slice('storage://'.length);
+    if(!originalPath.startsWith(owner.user_id+'/videos/')) return response(req,{error:'Invalid media ownership'},403);
+  }
+  const original=await resolveRef(video.video_url);
+  if(!original) return response(req,{error:'Unmanaged media URL rejected'},403);
+
+  const {data:job}=await admin.from('media_processing_jobs').select('renditions,hls_manifest_path,status').eq('video_id',videoId).eq('status','ready').order('updated_at',{ascending:false}).limit(1).maybeSingle();
+  const raw=Array.isArray(job?.renditions)?job.renditions:[];
+  const renditions:any[]=[];
+  for(const item of raw){
+    const ref=item?.storage_path||item?.playback_reference||item?.url;
+    const url=await resolveRef(ref);
+    if(!url) continue;
+    const height=Number(item?.height||0);
+    const label=String(item?.label||(height?height+'p':'Original')).slice(0,20);
+    renditions.push({label,height,url,type:String(item?.type||'video/mp4')});
+  }
+  renditions.sort((a,b)=>a.height-b.height);
+
+  const manifestRef=job?.hls_manifest_path||video.hls_manifest_path||video.hls_storage_path;
+  const manifest=manifestRef?await resolveRef(manifestRef):null;
+  const autoUrl=original;
+  const sources=[{label:'Automático',height:0,url:original,type:'video/mp4'},...renditions.filter((x,i,a)=>i===a.findIndex(y=>y.label===x.label))];
+
+  return response(req,{url:autoUrl,sources,adaptive_manifest:manifest,expires_in:120,anonymous:anonymousAllowed,adaptive:Boolean(manifest)});
 });

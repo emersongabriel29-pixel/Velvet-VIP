@@ -45,9 +45,14 @@ export async function uploadCreatorVideo(input:{
       premium_price:input.isPremium?input.premiumPrice:0,
       required_tier:input.isPremium?input.requiredTier:'free',
       category:input.category,hashtags:input.hashtags,is_draft:input.isDraft,
-      access_type:input.accessType,content_level:'sensual',anonymous_access:input.anonymousAccess
+      access_type:input.accessType,content_level:'sensual',anonymous_access:input.anonymousAccess,
+      source_storage_path:videoPath,media_status:'ready',processing_status:input.contentKind==='long'?'queued':'ready'
     }).select('id').single();
     if(inserted.error||!inserted.data) throw new Error(inserted.error?.message||'Falha ao registrar o vídeo.');
+    if(input.contentKind==='long'){
+      const queued=await supabase.rpc('enqueue_media_processing',{p_video_id:inserted.data.id,p_source_path:videoPath});
+      if(queued.error) throw new Error('O vídeo foi enviado, mas não foi possível enfileirar o processamento.');
+    }
     return {id:inserted.data.id,storagePath:videoPath};
   }catch(err){
     await supabase.storage.from('velvet-media').remove([videoPath]);
@@ -55,11 +60,23 @@ export async function uploadCreatorVideo(input:{
   }
 }
 
-export async function getPlayableVideoUrl(videoId:string):Promise<string>{
+export type PlaybackSource={label:string;height:number;url:string;type:string};
+export type VideoPlayback={url:string;sources:PlaybackSource[];adaptive:boolean;expires_in:number};
+
+export async function getVideoPlaybackOptions(videoId:string):Promise<VideoPlayback>{
   if(!supabase) throw new Error('Supabase não configurado.');
   const {data,error}=await supabase.functions.invoke('get-video-url',{body:{video_id:videoId}});
   if(error||!data?.url) throw new Error(data?.error||error?.message||'Não foi possível liberar o vídeo.');
-  return data.url;
+  return {
+    url:data.url,
+    sources:Array.isArray(data.sources)&&data.sources.length?data.sources:[{label:'Automático',height:0,url:data.url,type:'video/mp4'}],
+    adaptive:Boolean(data.adaptive),
+    expires_in:Number(data.expires_in||120)
+  };
+}
+
+export async function getPlayableVideoUrl(videoId:string):Promise<string>{
+  return (await getVideoPlaybackOptions(videoId)).url;
 }
 
 
@@ -77,6 +94,20 @@ export async function uploadProfileImage(file:File, kind:'avatar'|'cover'):Promi
   const uploaded=await supabase.storage.from('velvet-media').upload(path,file,{contentType:file.type,cacheControl:'3600',upsert:false});
   if(uploaded.error) throw new Error(`Falha ao enviar imagem: ${uploaded.error.message}`);
   return `storage://${path}`;
+}
+
+export async function resolvePrivateMediaRefs(refs:string[],expiresSeconds=3600):Promise<Map<string,string>>{
+  const result=new Map<string,string>();
+  const unique=[...new Set(refs.filter(Boolean))];
+  for(const ref of unique) if(!ref.startsWith('storage://')) result.set(ref,ref);
+  if(!supabase) return result;
+  const storageRefs=unique.filter(ref=>ref.startsWith('storage://'));
+  const paths=storageRefs.map(ref=>ref.slice('storage://'.length));
+  if(!paths.length) return result;
+  const {data,error}=await supabase.storage.from('velvet-media').createSignedUrls(paths,expiresSeconds);
+  if(error||!data) return result;
+  data.forEach((item:any,index:number)=>{ if(item?.signedUrl) result.set(storageRefs[index],item.signedUrl); });
+  return result;
 }
 
 export async function getProfileImageUrl(ref:string):Promise<string>{

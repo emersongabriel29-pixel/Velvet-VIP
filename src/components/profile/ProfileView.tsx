@@ -68,39 +68,71 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileLives, setProfileLives] = useState<any[]>([]);
   const [profileHighlights,setProfileHighlights]=useState<any[]>([]);
+  const [selectedHighlight,setSelectedHighlight]=useState<any|null>(null);
 
   const isOwnProfile = isAuthenticated && (!creatorId || (currentCreator && currentCreator.id === creatorId) || (creator && creator.user_id === currentUser.id));
 
   useEffect(() => {
-    let targetCreator: Creator | undefined;
-    if (creatorId) {
-      targetCreator = dbService.getCreatorById(creatorId);
-    } else if (currentCreator) {
-      targetCreator = currentCreator;
+    let cancelled=false;
+    (async()=>{
+      let targetCreator: Creator | undefined;
+      try{
+        if(isSupabaseConfigured && supabase){
+          if(creatorId){
+            const {data,error}=await supabase.from('creators').select('*').eq('id',creatorId).maybeSingle();
+            if(error) throw error;
+            targetCreator=(data||undefined) as Creator|undefined;
+          }else if(currentCreator){
+            targetCreator=currentCreator;
+          }
+
+          if(targetCreator){
+            const {data,error}=await supabase.from('videos').select('*').eq('creator_id',targetCreator.id).eq('is_removed',false).order('created_at',{ascending:false});
+            if(error) throw error;
+            const vList=await Promise.all((data||[]).map(async (v:any)=>({...v,thumbnail_url:await getProfileImageUrl(v.thumbnail_url||'')})));
+            if(!cancelled) setVideos(vList as Video[]);
+            if(isAuthenticated){
+              const {data:follow}=await supabase.from('follows').select('id').eq('follower_id',currentUser.id).eq('creator_id',targetCreator.id).maybeSingle();
+              if(!cancelled) setIsFollowing(Boolean(follow));
+            }else if(!cancelled) setIsFollowing(false);
+          }else if(isAuthenticated){
+            const {data:favs}=await supabase.from('favorites').select('video_id').eq('user_id',currentUser.id);
+            const ids=(favs||[]).map((x:any)=>x.video_id);
+            if(ids.length){
+              const {data}=await supabase.from('videos').select('*').in('id',ids);
+              const resolved=await Promise.all((data||[]).map(async (v:any)=>({...v,thumbnail_url:await getProfileImageUrl(v.thumbnail_url||'')})));
+              if(!cancelled) setVideos(resolved as Video[]);
+            }else if(!cancelled) setVideos([]);
+          }else if(!cancelled) setVideos([]);
+        }else{
+          targetCreator=creatorId?dbService.getCreatorById(creatorId):(currentCreator||undefined);
+          if(targetCreator){setVideos(dbService.getVideosByCreator(targetCreator.id));setIsFollowing(dbService.isFollowing(targetCreator.id));}
+          else setVideos(dbService.getFavorites());
+        }
+        if(!cancelled){
+          setCreator(targetCreator);
+          setNameInput(targetCreator?.display_name||currentUser.name);
+          setBioInput(targetCreator?.bio||currentUser.bio||'');
+          const [a,cv]=await Promise.all([getProfileImageUrl(targetCreator?.avatar_url||currentUser.avatar_url||''),getProfileImageUrl(targetCreator?.cover_url||'')]);
+          if(!cancelled){setAvatarPreview(a);setCoverPreview(cv);}
+        }
+      }catch(err:any){if(!cancelled)setProfileError(err?.message||'Não foi possível carregar o perfil.');}
+    })();
+    return()=>{cancelled=true};
+  }, [creatorId, currentCreator?.id, currentUser.id, isAuthenticated]);
+
+  const handleToggleFollow = async () => {
+    if (!creator || !isAuthenticated) return;
+    if(!isSupabaseConfigured || !supabase){
+      const nowF=dbService.toggleFollow(creator.id); setIsFollowing(nowF); setCreator(dbService.getCreatorById(creator.id)); return;
     }
-
-    setCreator(targetCreator);
-
-    if (targetCreator) {
-      const vList = dbService.getVideosByCreator(targetCreator.id);
-      setVideos(vList);
-      setIsFollowing(dbService.isFollowing(targetCreator.id));
-    } else {
-      // Regular user profile
-      const favs = dbService.getFavorites();
-      setVideos(favs);
+    if(isFollowing){
+      const {error}=await supabase.from('follows').delete().eq('follower_id',currentUser.id).eq('creator_id',creator.id);
+      if(!error){setIsFollowing(false);setCreator(prev=>prev?{...prev,total_followers:Math.max(0,(prev.total_followers||0)-1)}:prev);}
+    }else{
+      const {error}=await supabase.from('follows').insert({follower_id:currentUser.id,creator_id:creator.id});
+      if(!error){setIsFollowing(true);setCreator(prev=>prev?{...prev,total_followers:(prev.total_followers||0)+1}:prev);}
     }
-
-    setNameInput(currentUser.name);
-    setBioInput(currentUser.bio || '');
-    Promise.all([getProfileImageUrl(creator?.avatar_url || currentUser.avatar_url || ''), getProfileImageUrl(creator?.cover_url || '')]).then(([a,cv])=>{ setAvatarPreview(a); setCoverPreview(cv); });
-  }, [creatorId, currentCreator, currentUser]);
-
-  const handleToggleFollow = () => {
-    if (!creator) return;
-    const nowF = dbService.toggleFollow(creator.id);
-    setIsFollowing(nowF);
-    setCreator(dbService.getCreatorById(creator.id));
   };
 
   useEffect(() => {
@@ -390,7 +422,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       </div>
 
-      {creator && (profileLives.length > 0 || profileHighlights.length > 0) && <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="font-bold flex items-center gap-2"><Radio className="w-4 h-4 text-rose-500"/>Lives e destaques</h2>{profileLives.length>0&&onOpenLive&&<button onClick={onOpenLive} className="text-xs text-rose-400">Ver lives</button>}</div><div className="flex gap-4 overflow-x-auto pb-2">{profileLives.map(l=><button key={l.id} onClick={onOpenLive} className="w-24 shrink-0 text-center"><div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border-2 ${l.status==='live'?'border-rose-500 bg-rose-950/30':'border-amber-500 bg-zinc-900'}`}><Radio className={`h-7 w-7 ${l.status==='live'?'text-rose-400':'text-amber-300'}`}/></div><p className="mt-2 truncate text-xs font-bold">{l.status==='live'?'AO VIVO':l.title}</p></button>)}{profileHighlights.map(h=><button key={h.id} className="w-24 shrink-0 text-center"><div className="mx-auto h-20 w-20 overflow-hidden rounded-full border-2 border-zinc-700 bg-zinc-900">{h.display_url&&<img src={h.display_url} alt={h.title} className="h-full w-full object-cover"/>}</div><p className="mt-2 truncate text-xs font-bold">{h.title}</p></button>)}</div></section>}
+      {creator && (profileLives.length > 0 || profileHighlights.length > 0) && <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="font-bold flex items-center gap-2"><Radio className="w-4 h-4 text-rose-500"/>Lives e destaques</h2>{profileLives.length>0&&onOpenLive&&<button onClick={onOpenLive} className="text-xs text-rose-400">Ver lives</button>}</div><div className="flex gap-4 overflow-x-auto pb-2">{profileLives.map(l=><button key={l.id} onClick={onOpenLive} className="w-24 shrink-0 text-center"><div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border-2 ${l.status==='live'?'border-rose-500 bg-rose-950/30':'border-amber-500 bg-zinc-900'}`}><Radio className={`h-7 w-7 ${l.status==='live'?'text-rose-400':'text-amber-300'}`}/></div><p className="mt-2 truncate text-xs font-bold">{l.status==='live'?'AO VIVO':l.title}</p></button>)}{profileHighlights.map(h=><button key={h.id} onClick={()=>setSelectedHighlight(h)} className="w-24 shrink-0 text-center"><div className="mx-auto h-20 w-20 overflow-hidden rounded-full border-2 border-zinc-700 bg-zinc-900">{h.display_url&&<img src={h.display_url} alt={h.title} className="h-full w-full object-cover"/>}</div><p className="mt-2 truncate text-xs font-bold">{h.title}</p></button>)}</div></section>}
+
+      {selectedHighlight&&<div onClick={()=>setSelectedHighlight(null)} className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"><div onClick={e=>e.stopPropagation()} className="w-full max-w-lg overflow-hidden rounded-3xl border border-zinc-800 bg-[#111116] shadow-2xl">{selectedHighlight.media_type==='video'?<video src={selectedHighlight.display_url} controls autoPlay playsInline className="max-h-[70vh] w-full bg-black object-contain"/>:<img src={selectedHighlight.display_url} alt={selectedHighlight.title} className="max-h-[70vh] w-full bg-black object-contain"/>}<div className="flex items-center justify-between gap-3 p-4"><div><p className="text-[10px] font-bold uppercase tracking-[.2em] text-rose-400">Destaque</p><h3 className="font-bold">{selectedHighlight.title}</h3></div><button onClick={()=>setSelectedHighlight(null)} className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold">Fechar</button></div></div></div>}
 
       {/* Profile Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto border-b border-zinc-800 pb-3 mb-4">
