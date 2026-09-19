@@ -50,7 +50,8 @@ export async function uploadCreatorVideo(input:{
     }).select('id').single();
     if(inserted.error||!inserted.data) throw new Error(inserted.error?.message||'Falha ao registrar o vídeo.');
     if(input.contentKind==='long'){
-      await supabase.from('media_processing_jobs').insert({video_id:inserted.data.id,status:'queued',source_path:videoPath}).then(()=>{});
+      const queued=await supabase.rpc('enqueue_media_processing',{p_video_id:inserted.data.id,p_source_path:videoPath});
+      if(queued.error) throw new Error('O vídeo foi enviado, mas não foi possível enfileirar o processamento.');
     }
     return {id:inserted.data.id,storagePath:videoPath};
   }catch(err){
