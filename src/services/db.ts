@@ -1420,11 +1420,6 @@ class DatabaseService {
     this.notify();
   }
 
-  public markVisitorNotificationsAsRead() {
-    setStored('visitor_notifications_read_at', new Date().toISOString());
-    this.notify();
-  }
-
   public markNotificationsAsRead() {
     const cur = this.getCurrentUser();
     this.notifications = this.notifications.map(n => {
