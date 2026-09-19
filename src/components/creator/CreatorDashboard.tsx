@@ -22,7 +22,7 @@ import { dbService } from '../../services/db';
 import { useAuth } from '../../hooks/useAuth';
 import { CreatorAnalyticsPanel } from './CreatorAnalyticsPanel';
 import { CreatorPlansManager } from './CreatorPlansManager';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured, isDemoMode } from '../../lib/supabase';
 import { uploadProfileImage, getProfileImageUrl } from '../../services/media';
 
 interface CreatorDashboardProps {
@@ -74,11 +74,12 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
 
   const loadData = async () => {
     if (!creator.id) return;
-    if (!isSupabaseConfigured || !supabase) {
+    if (isDemoMode) {
       setVideos(dbService.getVideosByCreator(creator.id));
       setWithdrawals(dbService.getWithdrawals());
       return;
     }
+    if (!supabase) { setVideos([]); setWithdrawals([]); return; }
     const [videoRows,withdrawalRows]=await Promise.all([
       supabase.from('videos').select('*').eq('creator_id',creator.id).order('created_at',{ascending:false}),
       supabase.from('withdrawals').select('*').eq('creator_id',creator.id).order('created_at',{ascending:false})
@@ -111,7 +112,8 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   const handleDeleteVideo = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Remover este vídeo? Ele deixará de aparecer para os usuários.')) return;
-    if(!isSupabaseConfigured || !supabase){ dbService.deleteVideo(id); await loadData(); return; }
+    if(isDemoMode){ dbService.deleteVideo(id); await loadData(); return; }
+    if(!supabase){setPayoutMessage({type:'error',text:'Supabase não configurado.'});return;}
     const {error}=await supabase.from('videos').update({is_removed:true,moderation_status:'removed'}).eq('id',id).eq('creator_id',creator.id);
     if(error) setPayoutMessage({type:'error',text:error.message}); else await loadData();
   };
@@ -122,9 +124,10 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
     if (isNaN(amt) || amt <= 0) { setPayoutMessage({ type: 'error', text: 'Informe um valor válido para saque.' }); return; }
     if(!pixKey.trim()){setPayoutMessage({type:'error',text:'Informe sua chave PIX.'});return;}
     try {
-      if(!isSupabaseConfigured || !supabase){
+      if(isDemoMode){
         dbService.requestWithdrawal(creator.id, amt, pixKey, pixKeyType);
       }else{
+        if(!supabase) throw new Error('Supabase não configurado.');
         const {error}=await supabase.rpc('request_creator_withdrawal',{p_amount:amt,p_pix_key:pixKey.trim(),p_pix_key_type:pixKeyType});
         if(error) throw error;
       }

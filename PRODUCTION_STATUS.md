@@ -20,9 +20,10 @@ Verificado em 19/09/2026 contra o repositório (base `667ce08`) e o projeto Supa
 | Exportação da conta | Exporta registros próprios com paginação | Escopo informado no JSON; não representa auditoria jurídica ou todos os dados internos |
 | Planos de criador | Um editor real, dentro da aba Planos | Formulário duplicado que gravava só local foi retirado |
 | Demonstração | Instância local só existe com `VITE_DEMO_MODE` explícito; chamadas locais bloqueadas fora do demo | Código legado permanece para demonstração |
-| Upload | Fonte não é apagada se o cadastro existir e o enfileiramento falhar | Worker e recuperação operacional da fila seguem pendentes |
+| Upload | Fonte não é apagada se o cadastro existir e o enfileiramento falhar | Worker usa lease, heartbeat, retry e limite de três tentativas |
 | Reprodução | Valida publicação/moderação/processamento; assinatura não libera PPV separado | URLs já emitidas permanecem válidas por até 120 segundos |
-| HLS | Callback estável e recuperação limitada de falhas fatais | Não substitui pipeline de mídia ou proteção de segmentos na CDN |
+| Mídia | Worker FFmpeg cria ladder sem upscale, MP4, HLS e thumbnail; fila usa `SKIP LOCKED` | Container ainda precisa ser executado em infraestrutura persistente |
+| HLS | Manifesto e segmentos são arquivados no bucket privado | Reprodução usa MP4 assinado até existir gateway/CDN que assine também os segmentos |
 | Pagamento | Liquidação atômica, atribuição do acesso ao checkout, reembolso sem revogar recompra posterior | Testes de banco; não transação real no Mercado Pago |
 | Webhook | Confere ID assinado versus pagamento consultado; falhas retornam 503 para retry | Não confirma recebimento quando a liquidação falhou |
 | Dependências | Lockfile npm e `npm ci` nos workflows | Auditoria local: zero vulnerabilidades reportadas |
@@ -30,7 +31,7 @@ Verificado em 19/09/2026 contra o repositório (base `667ce08`) e o projeto Supa
 
 ## Banco e Edge Functions
 
-Aplicada a migration `20260919162845_atomic_payment_settlement.sql`.
+Aplicadas as migrations `20260919162845_atomic_payment_settlement.sql` e `20260919165758_media_worker_leases.sql`.
 A função `settle_verified_payment` é `SECURITY INVOKER` e executável somente por `service_role` (além do proprietário do banco). Anon e authenticated não têm EXECUTE.
 
 Atualizações implantadas nesta revisão: `payment-webhook` v5, `create-checkout` v3 e `get-video-url` v5. A reprodução pública usa autenticação no corpo da função: somente conteúdo gratuito, sensual, publicado, aprovado e pronto dispensa login. Conteúdo restrito exige sessão e autorização. Os endpoints legados de pagamento foram preservados para compatibilidade e não foram certificados nesta revisão.
@@ -38,8 +39,10 @@ Atualizações implantadas nesta revisão: `payment-webhook` v5, `create-checkou
 ## Verificações executadas
 
 - TypeScript e build Vite aprovados.
-- 71 testes Node aprovados, incluindo execução dos handlers HTTP com clientes/provedor simulados.
+- 75 testes Node aprovados, incluindo execução dos handlers HTTP com clientes/provedor simulados e a restrição do banco local ao modo demo.
+- 2 testes de integração FFmpeg aprovados com fontes reais em paisagem e retrato, validando MP4, playlists e segmentos HLS.
 - `tests/sql/payment-settlement.sql` executado no banco real dentro de transação com ROLLBACK: valor adulterado, aprovação, duplicidade, evento atrasado, reembolso, recompra, falha parcial, retry, assinatura e chargeback.
+- `tests/sql/core-flows.sql` executado no banco real dentro de transação com ROLLBACK: cadastro, papel, idade, aprovação de criador, RLS entre usuários, campos privilegiados, denúncia urgente, fila, lease e preservação da moderação.
 - Fixtures SQL foram desfeitas; não houve cobrança, transferência ou reembolso real.
 - Smoke HTTP após implantação: vídeo sem ID retorna 400, checkout sem sessão retorna 401; webhook retorna 503 "Webhook não configurado", comprovando ausência de pelo menos uma credencial necessária (`MERCADOPAGO_ACCESS_TOKEN`/`MERCADOPAGO_WEBHOOK_SECRET`).
 - Advisor de segurança sem novos alertas de banco; permanece `Leaked Password Protection Disabled`.
@@ -49,7 +52,7 @@ Atualizações implantadas nesta revisão: `payment-webhook` v5, `create-checkou
 | Pendência | O que falta |
 |---|---|
 | Senhas vazadas | Organização no Free; recurso nativo exige Pro ou superior. Nenhum upgrade contratado |
-| Vídeo 360p–4K/HLS | Worker/provedor, processamento real, segmentos protegidos, CDN e testes de reprodução longa |
+| Vídeo 360p–4K/HLS | Executar e monitorar o worker em servidor persistente; gateway/CDN para playlists privadas; carga e reprodução longa |
 | Lives | Ingestão, distribuição, reconexão, gravação e moderação ao vivo em provedor real |
 | Mercado Pago | Credenciais/ambiente de teste, compra até webhook, concorrência real, recusa e estorno no gateway |
 | Plataforma paga | Vigência/renovação do plano geral ainda precisa de ciclo completo; não há recorrência automática certificada |

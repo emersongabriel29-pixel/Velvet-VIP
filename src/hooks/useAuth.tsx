@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useRef } from 'react';
 import { User, Creator, UserRole } from '../types';
 import { dbService } from '../services/db';
 import { isSupabaseConfigured, isDemoMode, supabase } from '../lib/supabase';
@@ -57,8 +57,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [hasConsented18Plus, setHasConsented18Plus] = useState<boolean>(() => localStorage.getItem(AGE_CONSENT_KEY) === 'true');
   const [allUsers, setAllUsers] = useState<User[]>(() => demoMode ? dbService.getAllUsers() : []);
 
+  const profileRequest = useRef(0);
   const loadSupabaseProfile = async (userId: string, email?: string) => {
     if (!supabase) return null;
+    const request = ++profileRequest.current;
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
     if (error || !data) return null;
     const mapped = mapProfile(data, email || '');
@@ -66,9 +68,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data: plan } = await supabase.from('platform_plans').select('slug').eq('id', data.platform_plan_id).maybeSingle();
       if (plan?.slug === 'gratis' || plan?.slug === 'plus' || plan?.slug === 'vip') mapped.platform_plan_slug = plan.slug;
     }
+    const { data: creator } = await supabase.from('creators').select('*').eq('user_id', userId).maybeSingle();
+    if (request !== profileRequest.current) return null;
     setCurrentUser(mapped);
     setIsAuthenticated(true);
-    const { data: creator } = await supabase.from('creators').select('*').eq('user_id', userId).maybeSingle();
     setCurrentCreator(creator || undefined);
     setHasConsented18Plus(localStorage.getItem(AGE_CONSENT_KEY) === 'true');
     return mapped;
@@ -87,18 +90,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!supabase) return;
     let mounted = true;
-    supabase.auth.getSession().then(async ({ data }) => {
+    const applySession = (session: { user: { id: string; email?: string } } | null) => {
       if (!mounted) return;
-      if (data.session?.user) await loadSupabaseProfile(data.session.user.id, data.session.user.email || '');
-      else { setIsAuthenticated(false); setCurrentUser(guestUser); }
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return;
-      if (session?.user) await loadSupabaseProfile(session.user.id, session.user.email || '');
-      else { setIsAuthenticated(false); setCurrentUser(guestUser); setCurrentCreator(undefined); }
-    });
-    return () => { mounted = false; listener.subscription.unsubscribe(); };
+      ++profileRequest.current;
+      if (session?.user) {
+        // Leave the auth callback before performing additional Supabase requests.
+        const revision = profileRequest.current;
+        setTimeout(() => {
+          if (mounted && revision === profileRequest.current) void loadSupabaseProfile(session.user.id, session.user.email || '');
+        }, 0);
+      } else { setIsAuthenticated(false); setCurrentUser(guestUser); setCurrentCreator(undefined); }
+    };
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => applySession(session));
+    // INITIAL_SESSION is normally emitted by the listener. This also covers
+    // clients that attach after storage restoration has already completed.
+    void supabase.auth.getSession().then(({ data }) => applySession(data.session));
+    return () => { mounted = false; ++profileRequest.current; listener.subscription.unsubscribe(); };
   }, [demoMode]);
 
   const confirmAgeVerification = async () => {

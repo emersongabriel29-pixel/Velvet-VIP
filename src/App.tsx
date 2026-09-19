@@ -27,6 +27,7 @@ import { ProductToolPage } from './components/product/ProductToolPage';
 
 const VelvetVipApp: React.FC = () => {
   const { hasConsented18Plus } = useAuth();
+  const [selectedVideoId, setSelectedVideoId] = useState<string | undefined>();
   const [activeView, setActiveView] = useState<string>('feed');
   const [currentTab, setCurrentTab] = useState<FeedTab>('foryou');
   const [selectedCreatorId, setSelectedCreatorId] = useState<string | undefined>(undefined);
@@ -50,14 +51,14 @@ const VelvetVipApp: React.FC = () => {
   },[]);
 
   const handleSelectCreator = (creatorId: string) => { setSelectedCreatorId(creatorId); window.history.replaceState(null,'',`#creator=${creatorId}`); setActiveView('profile'); };
-  const handleSelectVideo = (_videoId: string) => { setActiveView('feed'); };
+  const handleSelectVideo = (videoId: string) => { setSelectedVideoId(videoId); setCurrentTab('foryou'); setActiveView('feed'); };
   const handleOpenProfile = () => { setSelectedCreatorId(undefined); if(window.location.hash.startsWith('#creator=')) window.history.replaceState(null,'',window.location.pathname+window.location.search); setActiveView('profile'); };
 
   return <div id="velvet-vip-root" className="min-h-screen overflow-x-hidden bg-[#09090b] font-sans text-zinc-100 selection:bg-rose-500 selection:text-white">
     <AgeVerificationModal />
     <Header currentTab={currentTab} onTabChange={(tab) => { setCurrentTab(tab); setActiveView('feed'); }} activeView={activeView} onViewChange={(view) => view === 'profile' ? handleOpenProfile() : setActiveView(view)} onOpenSupabaseModal={() => setSupabaseModalOpen(true)} onOpenWalletModal={() => setWalletModalOpen(true)} onOpenLanding={() => setActiveView('landing')} onOpenAuthModal={() => setAuthModalOpen(true)} onOpenLgpdModal={() => setLgpdModalOpen(true)} />
     <main className="w-full">
-      {activeView === 'feed' && <VideoFeed currentTab={currentTab} onSelectCreator={handleSelectCreator} onOpenUpload={() => setCreateHubOpen(true)} />}
+      {activeView === 'feed' && <VideoFeed selectedVideoId={selectedVideoId} currentTab={currentTab} onSelectCreator={handleSelectCreator} onOpenUpload={() => setCreateHubOpen(true)} />}
       {activeView === 'explore' && <ExplorePage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} />}
       {activeView === 'activity' && <NotificationsPage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} />}
       {activeView === 'profile' && <ProfileView creatorId={selectedCreatorId} onSelectVideo={handleSelectVideo} onOpenCreatorStudio={() => setActiveView('creator_studio')} onOpenMyPurchases={() => setActiveView('purchases')} onOpenWallet={() => setWalletModalOpen(true)} onOpenUpload={() => setCreateHubOpen(true)} onOpenLgpd={() => setLgpdModalOpen(true)} onOpenAuth={() => setAuthModalOpen(true)} onOpenLive={() => setActiveView('live')} />}
@@ -68,7 +69,7 @@ const VelvetVipApp: React.FC = () => {
       {activeView === 'live_studio' && <LiveStudio onBack={() => setActiveView('creator_studio')} onOpenLives={() => setActiveView('live')} />}
       {activeView === 'community' && <CommunityPage onBack={() => setActiveView('feed')} />}
       {activeView === 'more' && <ProductHub onOpen={(tool) => { setProductTool(tool); setActiveView('product_tool'); }} />}
-      {activeView === 'product_tool' && <ProductToolPage tool={productTool} onBack={() => setActiveView('more')} />}
+      {activeView === 'product_tool' && <ProductToolPage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} tool={productTool} onBack={() => setActiveView('more')} />}
       {activeView === 'monetization' && <MonetizationPage onBack={() => setActiveView('feed')} />}
       {activeView === 'landing' && <LandingPage onEnterApp={() => setActiveView('feed')} onOpenUpload={() => setCreateHubOpen(true)} />}
     </main>

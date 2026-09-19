@@ -25,7 +25,7 @@ import { Creator, Video } from '../../types';
 import { dbService } from '../../services/db';
 import { useAuth } from '../../hooks/useAuth';
 import { SubscribeModal } from '../creator/SubscribeModal';
-import { isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { isDemoMode, isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { uploadProfileImage, getProfileImageUrl } from '../../services/media';
 
 interface ProfileViewProps {
@@ -104,10 +104,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               if(!cancelled) setVideos(resolved as Video[]);
             }else if(!cancelled) setVideos([]);
           }else if(!cancelled) setVideos([]);
-        }else{
+        }else if(isDemoMode){
           targetCreator=creatorId?dbService.getCreatorById(creatorId):(currentCreator||undefined);
           if(targetCreator){setVideos(dbService.getVideosByCreator(targetCreator.id));setIsFollowing(dbService.isFollowing(targetCreator.id));}
           else setVideos(dbService.getFavorites());
+        }else{
+          throw new Error('Supabase não configurado.');
         }
         if(!cancelled){
           setCreator(targetCreator);
@@ -123,9 +125,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   const handleToggleFollow = async () => {
     if (!creator || !isAuthenticated) return;
-    if(!isSupabaseConfigured || !supabase){
+    if(isDemoMode){
       const nowF=dbService.toggleFollow(creator.id); setIsFollowing(nowF); setCreator(dbService.getCreatorById(creator.id)); return;
     }
+    if(!supabase)return;
     if(isFollowing){
       const {error}=await supabase.from('follows').delete().eq('follower_id',currentUser.id).eq('creator_id',creator.id);
       if(!error){setIsFollowing(false);setCreator(prev=>prev?{...prev,total_followers:Math.max(0,(prev.total_followers||0)-1)}:prev);}
@@ -154,7 +157,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setSavingProfile(true); setProfileError('');
     try {
       let avatarRef=currentUser.avatar_url;
-      if(avatarFile) avatarRef=isSupabaseConfigured ? await uploadProfileImage(avatarFile,'avatar') : avatarPreview;
+      if(avatarFile) avatarRef=isDemoMode ? avatarPreview : await uploadProfileImage(avatarFile,'avatar');
       await updateProfile({ name:nameInput, bio:bioInput, avatar_url:avatarRef });
       if(creator && isSupabaseConfigured && supabase){
         let coverRef=creator.cover_url || '';
@@ -162,7 +165,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         const {error}=await supabase.from('creators').update({display_name:nameInput,bio:bioInput,avatar_url:avatarRef,cover_url:coverRef}).eq('id',creator.id);
         if(error) throw error;
         setCreator(prev=>prev?{...prev,display_name:nameInput,bio:bioInput,avatar_url:avatarRef,cover_url:coverRef}:prev);
-      } else if(creator) {
+      } else if(creator && isDemoMode) {
         dbService.updateCreator(creator.id,{display_name:nameInput,bio:bioInput,avatar_url:avatarRef,cover_url:coverPreview || creator.cover_url});
       }
       setAvatarFile(null); setCoverFile(null); setIsEditingBio(false);
