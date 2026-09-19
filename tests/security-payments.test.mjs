@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
-const sql=fs.readFileSync('supabase/migrations/024_security_stage6_payments_antifraud.sql','utf8');
+const sql=fs.readFileSync('supabase/migrations/20260918111808_024_security_stage6_payments_antifraud.sql','utf8');
 const hook=fs.readFileSync('supabase/functions/mercadopago-webhook/index.ts','utf8');
 const create=fs.readFileSync('supabase/functions/create-payment-preference/index.ts','utf8');
 test('payment credit validates amount and currency',()=>{assert.match(hook,/expectedAmount/);assert.match(hook,/currency !== 'BRL'/);assert.match(hook,/Payment integrity check failed/);});

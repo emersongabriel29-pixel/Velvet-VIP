@@ -1,12 +1,12 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
 
 const read=p=>fs.readFileSync(p,'utf8');
-const stage2=read('supabase/migrations/020_security_stage2_rls.sql');
-const stage3=read('supabase/migrations/021_security_stage3_private_media.sql');
-const stage4=read('supabase/migrations/022_security_stage4_api_rate_limits.sql');
-const stage5=read('supabase/migrations/023_security_stage5_admin_auth.sql');
-const stage6=read('supabase/migrations/024_security_stage6_payments_antifraud.sql');
-const stage7=read('supabase/migrations/025_security_stage7_observability.sql');
+const stage2=read('supabase/migrations/20260918111750_020_security_stage2_rls.sql');
+const stage3=read('supabase/migrations/20260918111754_021_security_stage3_private_media.sql');
+const stage4=read('supabase/migrations/20260918111758_022_security_stage4_api_rate_limits.sql');
+const stage5=read('supabase/migrations/20260918111802_023_security_stage5_admin_auth.sql');
+const stage6=read('supabase/migrations/20260918111808_024_security_stage6_payments_antifraud.sql');
+const stage7=read('supabase/migrations/20260918111811_025_security_stage7_observability.sql');
 const webhook=read('supabase/functions/mercadopago-webhook/index.ts');
 
 test('E2E contract: restricted accounts cannot publish/message/purchase',()=>{

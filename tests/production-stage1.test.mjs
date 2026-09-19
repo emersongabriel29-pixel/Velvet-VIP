@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
 const read=p=>fs.readFileSync(p,'utf8');
-const migration=read('supabase/migrations/026_production_stage1_blockers.sql');
+const migration=read('supabase/migrations/20260918111815_026_production_stage1_blockers.sql');
 const legacyCheckout=read('supabase/functions/create-checkout/index.ts');
 const legacyWebhook=read('supabase/functions/payment-webhook/index.ts');
 const supabaseClient=read('src/lib/supabase.ts');

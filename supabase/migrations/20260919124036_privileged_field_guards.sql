@@ -1,0 +1,4 @@
+-- Historical migration marker: privileged_field_guards remote follow-up
+-- Already applied to the linked Supabase project before repository migration
+-- history was normalized. Intentionally no-op: this file aligns the migration
+-- version without replaying production bootstrap/data operations.
