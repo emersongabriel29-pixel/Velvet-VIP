@@ -12,7 +12,8 @@ import {
   Lock,
   Crown,
   Sparkles,
-  Maximize2
+  Maximize2,
+  Settings
 } from 'lucide-react';
 import { Video } from '../../types';
 import { dbService } from '../../services/db';
@@ -52,6 +53,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [hasFavorited, setHasFavorited] = useState(Boolean(video.has_favorited));
   const [showHeartBurst, setShowHeartBurst] = useState(false);
   const [expandDesc, setExpandDesc] = useState(false);
+  const [showQuality,setShowQuality]=useState(false);
+  const [quality,setQuality]=useState('auto');
   const [playbackUrl, setPlaybackUrl] = useState(video.video_url.startsWith('storage://') ? '' : video.video_url);
   const lastTapRef = useRef<number>(0);
 
@@ -199,7 +202,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           }`}
         />
 
-        {(video.content_kind === 'long' || video.duration_seconds >= 60) && <div className="absolute top-16 sm:top-4 left-4 z-30 rounded-lg bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-md">PRÉVIA • 15s • VÍDEO LONGO</div>}
+        {(video.content_kind === 'long' || video.duration_seconds >= 60) && <div className="absolute top-16 sm:top-4 left-4 z-30 flex items-center gap-2"><div className="absolute top-16 sm:top-4 left-4 z-30 rounded-lg bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-md">PRÉVIA • 15s • VÍDEO LONGO</div><div className="relative"><button onClick={(e)=>{e.stopPropagation();setShowQuality(v=>!v)}} className="rounded-lg bg-black/60 p-1.5 text-white backdrop-blur-md" title="Qualidade"><Settings className="h-3.5 w-3.5"/></button>{showQuality&&<div onClick={e=>e.stopPropagation()} className="absolute left-0 mt-1 w-28 rounded-xl border border-white/10 bg-black/90 p-1 shadow-xl">{['auto','360p','480p','720p','1080p','4K'].map(q=><button key={q} onClick={()=>{setQuality(q);setShowQuality(false)}} className={`block w-full rounded-lg px-2 py-1.5 text-left text-[10px] ${quality===q?'bg-rose-600 text-white':'text-zinc-300 hover:bg-white/10'}`}>{q==='auto'?'Automático':q}</button>)}</div>}</div></div>}
 
         {/* Double-tap heart burst animation */}
         {showHeartBurst && (
