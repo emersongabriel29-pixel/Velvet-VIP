@@ -77,8 +77,8 @@ Deno.serve(async(req)=>{
 
   const manifestRef=job?.hls_manifest_path||video.hls_manifest_path||video.hls_storage_path;
   const manifest=manifestRef?await resolveRef(manifestRef):null;
-  const autoUrl=manifest||original;
-  const sources=[{label:'Automático',height:0,url:autoUrl,type:manifest?'application/vnd.apple.mpegurl':'video/mp4'},...renditions.filter((x,i,a)=>i===a.findIndex(y=>y.label===x.label))];
+  const autoUrl=original;
+  const sources=[{label:'Automático',height:0,url:original,type:'video/mp4'},...renditions.filter((x,i,a)=>i===a.findIndex(y=>y.label===x.label))];
 
-  return response(req,{url:autoUrl,sources,expires_in:120,anonymous:anonymousAllowed,adaptive:Boolean(manifest)});
+  return response(req,{url:autoUrl,sources,adaptive_manifest:manifest,expires_in:120,anonymous:anonymousAllowed,adaptive:Boolean(manifest)});
 });
