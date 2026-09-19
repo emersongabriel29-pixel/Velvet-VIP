@@ -53,6 +53,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   const [basicPrice, setBasicPrice] = useState(29.90);
   const [vipPrice, setVipPrice] = useState(59.90);
   const [plansSaved, setPlansSaved] = useState(false);
+  const [pageCopy,setPageCopy]=useState({title:'Creator Studio',subtitle:'Publique, faça lives e monetize sua comunidade.'});
 
   const creator: Creator = currentCreator || {
     id: 'cr-default',
@@ -107,6 +108,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   const deleteHighlight = async (id:string) => { if(!supabase||!confirm('Excluir este destaque?'))return;await supabase.from('creator_highlights').delete().eq('id',id);await loadHighlights(); };
 
   useEffect(() => {
+    if(isSupabaseConfigured && supabase){supabase.from('app_content_settings').select('creator_page_title,creator_page_subtitle').eq('id','global').maybeSingle().then(({data})=>{if(data)setPageCopy({title:data.creator_page_title||'Creator Studio',subtitle:data.creator_page_subtitle||'Publique, faça lives e monetize sua comunidade.'});});}
     void loadData();
     void loadHighlights();
     setBasicPrice(creator.subscription_price_basic || 29.90);
@@ -164,13 +166,13 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold mb-2">
             <Sparkles className="w-3.5 h-3.5 fill-amber-400" />
-            VELVET CREATOR STUDIO
+            {pageCopy.title}
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white font-display">
             Painel do Criador • {creator.display_name}
           </h1>
           <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
-            Gerencie seus vídeos verticais, planos de assinatura VIP, faturamento e solicitações de saque.
+            {pageCopy.subtitle}
           </p>
         </div>
 
