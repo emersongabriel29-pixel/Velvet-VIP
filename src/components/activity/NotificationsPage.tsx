@@ -44,8 +44,8 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
   }, [isAuthenticated]);
 
   const handleMarkAllRead = () => {
-    if (!isAuthenticated) return;
-    dbService.markAllNotificationsAsRead();
+    if (isAuthenticated) dbService.markAllNotificationsAsRead();
+    else dbService.markVisitorNotificationsAsRead();
     loadNotifications();
   };
 
@@ -82,13 +82,13 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
           <p className="text-xs text-zinc-400">{isAuthenticated ? 'Todas as novidades e atividades da sua conta aparecem aqui em uma única lista.' : 'Descubra conteúdos novos e criadores que você poderá seguir ao criar sua conta.'}</p>
         </div>
 
-        {isAuthenticated && <button
+        <button
           onClick={handleMarkAllRead}
           className="shrink-0 px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
         >
           <CheckCheck className="w-3.5 h-3.5 text-zinc-400" />
           <span className="hidden sm:inline">Marcar todas como lidas</span><span className="sm:hidden">Ler todas</span>
-        </button>}
+        </button>
       </div>
 
       {/* Unified notification stream: no choice between content/creators. */}
