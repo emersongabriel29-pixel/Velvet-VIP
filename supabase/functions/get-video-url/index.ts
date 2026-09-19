@@ -53,6 +53,12 @@ Deno.serve(async(req)=>{
   };
 
   if(!video.video_url) return response(req,{error:'Media unavailable'},404);
+  const {data:owner}=await admin.from('creators').select('user_id').eq('id',video.creator_id).single();
+  if(!owner?.user_id) return response(req,{error:'Creator not found'},404);
+  if(video.video_url.startsWith('storage://')){
+    const originalPath=video.video_url.slice('storage://'.length);
+    if(!originalPath.startsWith(owner.user_id+'/videos/')) return response(req,{error:'Invalid media ownership'},403);
+  }
   const original=await resolveRef(video.video_url);
   if(!original) return response(req,{error:'Unmanaged media URL rejected'},403);
 
