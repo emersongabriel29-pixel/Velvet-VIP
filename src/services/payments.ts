@@ -1,11 +1,12 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
-export type CheckoutKind = 'platform_plan' | 'creator_plan' | 'tip';
+export type CheckoutKind = 'platform_plan' | 'creator_plan' | 'pay_per_view' | 'tip';
 
 export async function startCheckout(input: {
   kind: CheckoutKind;
   planId?: string;
   creatorId?: string;
+  videoId?: string;
   amount?: number;
   message?: string;
 }): Promise<{ checkoutUrl: string }> {
