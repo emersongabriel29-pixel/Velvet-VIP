@@ -96,6 +96,20 @@ export async function uploadProfileImage(file:File, kind:'avatar'|'cover'):Promi
   return `storage://${path}`;
 }
 
+export async function resolvePrivateMediaRefs(refs:string[],expiresSeconds=3600):Promise<Map<string,string>>{
+  const result=new Map<string,string>();
+  const unique=[...new Set(refs.filter(Boolean))];
+  for(const ref of unique) if(!ref.startsWith('storage://')) result.set(ref,ref);
+  if(!supabase) return result;
+  const storageRefs=unique.filter(ref=>ref.startsWith('storage://'));
+  const paths=storageRefs.map(ref=>ref.slice('storage://'.length));
+  if(!paths.length) return result;
+  const {data,error}=await supabase.storage.from('velvet-media').createSignedUrls(paths,expiresSeconds);
+  if(error||!data) return result;
+  data.forEach((item:any,index:number)=>{ if(item?.signedUrl) result.set(storageRefs[index],item.signedUrl); });
+  return result;
+}
+
 export async function getProfileImageUrl(ref:string):Promise<string>{
   if(!ref?.startsWith('storage://')) return ref || '';
   if(!supabase) return '';
