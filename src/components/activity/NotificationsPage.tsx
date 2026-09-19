@@ -27,7 +27,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
 
 
   const loadNotifications = () => {
-    setNotifications(isAuthenticated ? dbService.getNotifications() : []);
+    setNotifications(isAuthenticated ? dbService.getNotifications() : dbService.getVisitorNotifications());
   };
 
   useEffect(() => {
@@ -95,15 +95,15 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
       {/* Notifications List */}
       {!isAuthenticated && (
         <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 text-xs text-zinc-400">
-          Entre na sua conta para receber todas as notificações em uma única lista: novos conteúdos, novos criadores, interações e monetização.
+          Você pode acompanhar novidades públicas sem criar conta. Entre para receber também interações, assinaturas, compras e outras notificações da sua conta.
         </div>
       )}
       <div className="space-y-2">
-        {!isAuthenticated ? null : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="py-16 text-center text-zinc-500">
             <Bell className="w-12 h-12 mx-auto mb-2 opacity-30 stroke-[1.5]" />
             <p className="text-sm font-semibold text-zinc-400">Nenhuma notificação por enquanto</p>
-            <p className="text-xs mt-1">Curtidas, comentários, assinaturas e compras aparecerão aqui.</p>
+            <p className="text-xs mt-1">{isAuthenticated ? 'Curtidas, comentários, assinaturas e compras aparecerão aqui.' : 'Novos conteúdos e criadores aparecerão aqui.'}</p>
           </div>
         ) : (
           filtered.map((n) => (
@@ -111,6 +111,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
               key={n.id}
               onClick={() => {
                 if (n.target_video_id && onSelectVideo) onSelectVideo(n.target_video_id);
+                else if (n.target_id && n.type === 'new_creator' && onSelectCreator) onSelectCreator(n.target_id);
               }}
               className={`p-3 rounded-xl border transition-all flex items-start justify-between gap-3 cursor-pointer ${
                 n.read
