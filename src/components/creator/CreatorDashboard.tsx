@@ -73,8 +73,10 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
     created_at: new Date().toISOString(),
   };
 
-  const creatorLevel = Math.max(1, Math.floor((creator.total_earnings || 0) / 1000) + 1);
-  const nextLevelTarget = creatorLevel * 1000;
+  const creatorLevel = creator.level || 1;
+  const creatorScore = Number(creator.level_score || 0);
+  const levelTargets:Record<number,number>={1:100,2:300,3:700,4:1400,5:1400};
+  const nextLevelTarget = levelTargets[creatorLevel] || 1400;
 
   const loadData = async () => {
     if (!creator.id) return;
@@ -171,9 +173,10 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
           <h1 className="text-2xl sm:text-3xl font-black text-white font-display">
             Painel do Criador • {creator.display_name}
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
-            {pageCopy.subtitle}
-          </p>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">{pageCopy.subtitle}</p>
+          <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[11px] font-bold text-amber-300">
+            ⭐ Nível {creatorLevel} • {creatorScore.toFixed(0)} pontos{creatorLevel<5?` • ${Math.max(0,nextLevelTarget-creatorScore).toFixed(0)} para o próximo`: ' • nível máximo'}
+          </div>
         </div>
 
         <button
