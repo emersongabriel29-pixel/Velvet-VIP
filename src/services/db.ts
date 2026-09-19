@@ -1589,6 +1589,7 @@ class DatabaseService {
     localStorage.removeItem(STORAGE_KEY_PREFIX + 'reports');
     localStorage.removeItem(STORAGE_KEY_PREFIX + 'withdrawals');
     localStorage.removeItem(STORAGE_KEY_PREFIX + 'current_user_id');
+    localStorage.removeItem(STORAGE_KEY_PREFIX + 'visitor_notifications_read_at');
 
     this.users = INITIAL_USERS;
     this.creators = INITIAL_CREATORS;
