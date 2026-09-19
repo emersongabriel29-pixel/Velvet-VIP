@@ -17,7 +17,9 @@ import {
 } from 'lucide-react';
 import { Video } from '../../types';
 import { dbService } from '../../services/db';
-import { getPlayableVideoUrl } from '../../services/media';
+import { getVideoPlaybackOptions, PlaybackSource } from '../../services/media';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { useAuth } from '../../hooks/useAuth';
 
 interface VideoCardProps {
   video: Video;
@@ -44,6 +46,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   onSelectCreator,
   onTagClick,
 }) => {
+  const { currentUser, isAuthenticated } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -54,27 +57,49 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [showHeartBurst, setShowHeartBurst] = useState(false);
   const [expandDesc, setExpandDesc] = useState(false);
   const [showQuality,setShowQuality]=useState(false);
-  const [quality,setQuality]=useState('auto');
+  const [quality,setQuality]=useState('Automático');
+  const [playbackSources,setPlaybackSources]=useState<PlaybackSource[]>([]);
   const [playbackUrl, setPlaybackUrl] = useState(video.video_url.startsWith('storage://') ? '' : video.video_url);
   const lastTapRef = useRef<number>(0);
 
   useEffect(() => {
-    if (video.creator_id) {
-      setIsFollowing(dbService.isFollowing(video.creator_id));
-    }
-  }, [video.creator_id]);
+    let cancelled=false;
+    (async()=>{
+      if(!isSupabaseConfigured || !supabase || !isAuthenticated){
+        if(!cancelled){
+          setIsFollowing(video.creator_id?dbService.isFollowing(video.creator_id):false);
+          setHasLiked(Boolean(video.has_liked));
+          setHasFavorited(Boolean(video.has_favorited));
+        }
+        return;
+      }
+      const [like,fav,follow]=await Promise.all([
+        supabase.from('video_likes').select('id').eq('video_id',video.id).eq('user_id',currentUser.id).maybeSingle(),
+        supabase.from('favorites').select('id').eq('video_id',video.id).eq('user_id',currentUser.id).maybeSingle(),
+        supabase.from('follows').select('id').eq('creator_id',video.creator_id).eq('follower_id',currentUser.id).maybeSingle()
+      ]);
+      if(!cancelled){setHasLiked(Boolean(like.data));setHasFavorited(Boolean(fav.data));setIsFollowing(Boolean(follow.data));}
+    })();
+    return()=>{cancelled=true};
+  }, [video.id, video.creator_id, currentUser.id, isAuthenticated]);
 
   useEffect(() => {
     setLikesCount(video.likes_count);
-    setHasLiked(Boolean(video.has_liked));
-    setHasFavorited(Boolean(video.has_favorited));
-  }, [video.likes_count, video.has_liked, video.has_favorited]);
+  }, [video.likes_count]);
 
   useEffect(() => {
     let cancelled=false;
+    setPlaybackSources([]);
+    setQuality('Automático');
     setPlaybackUrl(video.video_url.startsWith('storage://') ? '' : video.video_url);
     if (video.video_url.startsWith('storage://') && video.has_unlocked) {
-      getPlayableVideoUrl(video.id).then(url=>{if(!cancelled)setPlaybackUrl(url);}).catch(()=>{if(!cancelled)setPlaybackUrl('');});
+      getVideoPlaybackOptions(video.id).then(data=>{
+        if(cancelled)return;
+        setPlaybackUrl(data.url);
+        setPlaybackSources(data.sources);
+      }).catch(()=>{if(!cancelled){setPlaybackUrl('');setPlaybackSources([]);}});
+    } else if(!video.video_url.startsWith('storage://') && video.video_url){
+      setPlaybackSources([{label:'Automático',height:0,url:video.video_url,type:'video/mp4'}]);
     }
     return ()=>{cancelled=true;};
   }, [video.id, video.video_url, video.has_unlocked]);
@@ -148,22 +173,34 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     lastTapRef.current = now;
   };
 
-  const handleLike = () => {
-    const res = dbService.toggleLike(video.id);
-    setHasLiked(res.hasLiked);
-    setLikesCount(res.count);
+  const handleLike = async () => {
+    if(!isSupabaseConfigured || !supabase){
+      const res=dbService.toggleLike(video.id);setHasLiked(res.hasLiked);setLikesCount(res.count);return;
+    }
+    if(!isAuthenticated)return;
+    const previous=hasLiked;
+    setHasLiked(!previous);setLikesCount(v=>Math.max(0,v+(previous?-1:1)));
+    const {data,error}=await supabase.rpc('toggle_video_like',{p_video_id:video.id});
+    if(error){setHasLiked(previous);setLikesCount(v=>Math.max(0,v+(previous?1:-1)));return;}
+    setHasLiked(Boolean(data));
   };
 
-  const handleFavorite = () => {
-    const fav = dbService.toggleFavorite(video.id);
-    setHasFavorited(fav);
+  const handleFavorite = async () => {
+    if(!isSupabaseConfigured || !supabase){setHasFavorited(dbService.toggleFavorite(video.id));return;}
+    if(!isAuthenticated)return;
+    const previous=hasFavorited;setHasFavorited(!previous);
+    const {data,error}=await supabase.rpc('toggle_video_favorite',{p_video_id:video.id});
+    if(error)setHasFavorited(previous);else setHasFavorited(Boolean(data));
   };
 
-  const handleToggleFollow = (e: React.MouseEvent) => {
+  const handleToggleFollow = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!video.creator_id) return;
-    const nowFollowing = dbService.toggleFollow(video.creator_id);
-    setIsFollowing(nowFollowing);
+    if(!isSupabaseConfigured || !supabase){setIsFollowing(dbService.toggleFollow(video.creator_id));return;}
+    if(!isAuthenticated)return;
+    const previous=isFollowing;setIsFollowing(!previous);
+    const {data,error}=await supabase.rpc('toggle_creator_follow',{p_creator_id:video.creator_id});
+    if(error)setIsFollowing(previous);else setIsFollowing(Boolean(data));
   };
 
   const handleFullscreen = (e: React.MouseEvent) => {
@@ -202,7 +239,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           }`}
         />
 
-        {(video.content_kind === 'long' || video.duration_seconds >= 60) && <div className="absolute top-16 sm:top-4 left-4 z-30 flex items-center gap-2"><div className="absolute top-16 sm:top-4 left-4 z-30 rounded-lg bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-md">PRÉVIA • 15s • VÍDEO LONGO</div><div className="relative"><button onClick={(e)=>{e.stopPropagation();setShowQuality(v=>!v)}} className="rounded-lg bg-black/60 p-1.5 text-white backdrop-blur-md" title="Qualidade"><Settings className="h-3.5 w-3.5"/></button>{showQuality&&<div onClick={e=>e.stopPropagation()} className="absolute left-0 mt-1 w-28 rounded-xl border border-white/10 bg-black/90 p-1 shadow-xl">{['auto','360p','480p','720p','1080p','4K'].map(q=><button key={q} onClick={()=>{setQuality(q);setShowQuality(false)}} className={`block w-full rounded-lg px-2 py-1.5 text-left text-[10px] ${quality===q?'bg-rose-600 text-white':'text-zinc-300 hover:bg-white/10'}`}>{q==='auto'?'Automático':q}</button>)}</div>}</div></div>}
+        {(video.content_kind === 'long' || video.duration_seconds >= 60) && <div className="absolute top-16 sm:top-4 left-4 z-30 flex items-center gap-2"><div className="rounded-lg bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-md">PRÉVIA • 15s • VÍDEO LONGO</div>{playbackSources.length>1&&<div className="relative"><button onClick={(e)=>{e.stopPropagation();setShowQuality(v=>!v)}} className="rounded-lg bg-black/60 p-1.5 text-white backdrop-blur-md" title="Qualidade"><Settings className="h-3.5 w-3.5"/></button>{showQuality&&<div onClick={e=>e.stopPropagation()} className="absolute left-0 mt-1 w-32 rounded-xl border border-white/10 bg-black/95 p-1 shadow-xl">{playbackSources.map(src=><button key={src.label} onClick={()=>{setQuality(src.label);setPlaybackUrl(src.url);setShowQuality(false)}} className={`block w-full rounded-lg px-2 py-1.5 text-left text-[10px] ${quality===src.label?'bg-rose-600 text-white':'text-zinc-300 hover:bg-white/10'}`}>{src.label}</button>)}</div>}</div>}</div>}
 
         {/* Double-tap heart burst animation */}
         {showHeartBurst && (
