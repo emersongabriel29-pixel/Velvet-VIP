@@ -61,16 +61,22 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [playbackSources,setPlaybackSources]=useState<PlaybackSource[]>([]);
   const [playbackUrl, setPlaybackUrl] = useState(video.video_url.startsWith('storage://') ? '' : video.video_url);
   const lastTapRef = useRef<number>(0);
+  const canPlayback = !video.is_premium || Boolean(video.has_unlocked);
+  const isLocked = video.is_premium && !video.has_unlocked;
 
   useEffect(() => {
     let cancelled=false;
     (async()=>{
-      if(!isSupabaseConfigured || !supabase || !isAuthenticated){
+      if(!isSupabaseConfigured || !supabase){
         if(!cancelled){
           setIsFollowing(video.creator_id?dbService.isFollowing(video.creator_id):false);
           setHasLiked(Boolean(video.has_liked));
           setHasFavorited(Boolean(video.has_favorited));
         }
+        return;
+      }
+      if(!isAuthenticated){
+        if(!cancelled){setIsFollowing(false);setHasLiked(false);setHasFavorited(false);}
         return;
       }
       const [like,fav,follow]=await Promise.all([
@@ -92,7 +98,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     setPlaybackSources([]);
     setQuality('Automático');
     setPlaybackUrl(video.video_url.startsWith('storage://') ? '' : video.video_url);
-    if (video.video_url.startsWith('storage://') && video.has_unlocked) {
+    if (video.video_url.startsWith('storage://') && canPlayback) {
       getVideoPlaybackOptions(video.id).then(data=>{
         if(cancelled)return;
         setPlaybackUrl(data.url);
@@ -102,14 +108,14 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       setPlaybackSources([{label:'Automático',height:0,url:video.video_url,type:'video/mp4'}]);
     }
     return ()=>{cancelled=true;};
-  }, [video.id, video.video_url, video.has_unlocked]);
+  }, [video.id, video.video_url, canPlayback]);
 
   // Handle Play/Pause when card becomes active/inactive
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
 
-    if (isActive && video.has_unlocked) {
+    if (isActive && canPlayback) {
       const playPromise = el.play();
       if (playPromise !== undefined) {
         playPromise
@@ -119,12 +125,14 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             setIsPlaying(false);
           });
       }
-      dbService.recordView(video.id);
+      if(isSupabaseConfigured && supabase){
+        if(isAuthenticated) void supabase.rpc('record_video_view',{p_video_id:video.id,p_duration_seconds:0});
+      }else dbService.recordView(video.id);
     } else {
       el.pause();
       setIsPlaying(false);
     }
-  }, [isActive, video.has_unlocked, video.id]);
+  }, [isActive, canPlayback, video.id, isAuthenticated]);
 
   // Synchronize mute state
   useEffect(() => {
@@ -160,7 +168,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       setTimeout(() => setShowHeartBurst(false), 900);
     } else {
       // Single tap -> toggle playback
-      if (videoRef.current && video.has_unlocked) {
+      if (videoRef.current && canPlayback) {
         if (isPlaying) {
           videoRef.current.pause();
           setIsPlaying(false);
@@ -213,8 +221,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       }
     }
   };
-
-  const isLocked = video.is_premium && !video.has_unlocked;
 
   return (
     <div
