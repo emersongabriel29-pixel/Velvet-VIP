@@ -79,7 +79,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
       <div className="flex items-start justify-between gap-3 pb-3 border-b border-zinc-800 mb-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-white font-display">Atividade & Notificações</h1>
-          <p className="text-xs text-zinc-400">{isAuthenticated ? 'Interações da sua conta e recomendações para descobrir novos conteúdos.' : 'Descubra conteúdos novos e criadores que você poderá seguir ao criar sua conta.'}</p>
+          <p className="text-xs text-zinc-400">{isAuthenticated ? 'Todas as novidades e atividades da sua conta aparecem aqui em uma única lista.' : 'Descubra conteúdos novos e criadores que você poderá seguir ao criar sua conta.'}</p>
         </div>
 
         {isAuthenticated && <button
@@ -94,17 +94,8 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
       {/* Unified notification stream: no choice between content/creators. */}
       {/* Notifications List */}
       {!isAuthenticated && (
-        <div className="mb-4 grid gap-3 sm:grid-cols-2">
-          <button onClick={() => onSelectCreator?.('creator-001')} className="rounded-2xl border border-rose-500/20 bg-rose-950/10 p-4 text-left hover:border-rose-500/50">
-            <Crown className="mb-3 h-5 w-5 text-amber-400" />
-            <p className="text-sm font-bold text-white">Criadores para conhecer</p>
-            <p className="mt-1 text-xs text-zinc-400">Explore perfis em destaque. Crie uma conta para seguir seus favoritos.</p>
-          </button>
-          <button onClick={() => onSelectVideo?.('video-001')} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 text-left hover:border-rose-500/40">
-            <Bell className="mb-3 h-5 w-5 text-rose-400" />
-            <p className="text-sm font-bold text-white">Novos conteúdos</p>
-            <p className="mt-1 text-xs text-zinc-400">Veja lançamentos gratuitos e descubra novos criadores.</p>
-          </button>
+        <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 text-xs text-zinc-400">
+          Entre na sua conta para receber todas as notificações em uma única lista: novos conteúdos, novos criadores, interações e monetização.
         </div>
       )}
       <div className="space-y-2">
