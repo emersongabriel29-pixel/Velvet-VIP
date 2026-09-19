@@ -10,6 +10,7 @@ import { SubscribeModal } from '../creator/SubscribeModal';
 import { AdBanner } from '../ads/AdBanner';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { resolvePrivateMediaRefs } from '../../services/media';
 
 interface VideoFeedProps {
   currentTab: FeedTab;
@@ -50,11 +51,53 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
     const { data, error } = await query.limit(100);
     if (error) { console.error('feed_load_failed', error.message); setVideos([]); return; }
     let list = (data || []) as unknown as Video[];
-    if (currentTab === 'following' && currentUser?.id) {
-      const { data: follows } = await supabase.from('follows').select('creator_id').eq('user_id', currentUser.id);
-      const ids = new Set((follows || []).map((x:any) => x.creator_id));
-      list = list.filter((v:any) => ids.has(v.creator_id));
+    const {data:{user}}=await supabase.auth.getUser();
+
+    let purchasedIds=new Set<string>();
+    const subscriptionRank=new Map<string,number>();
+    if(user){
+      const [purchases,subscriptions]=await Promise.all([
+        supabase.from('purchases').select('video_id').eq('user_id',user.id).eq('status','completed'),
+        supabase.from('subscriptions').select('creator_id,plan_tier,current_period_end').eq('user_id',user.id).eq('status','active')
+      ]);
+      purchasedIds=new Set((purchases.data||[]).map((x:any)=>x.video_id));
+      const rank:Record<string,number>={free:0,basic:1,vip:2,exclusive:3};
+      for(const row of subscriptions.data||[]){
+        if(row.current_period_end && new Date(row.current_period_end)<=new Date()) continue;
+        const value=rank[(row as any).plan_tier]||0;
+        subscriptionRank.set((row as any).creator_id,Math.max(subscriptionRank.get((row as any).creator_id)||0,value));
+      }
+      if(currentTab==='following'){
+        const {data:follows}=await supabase.from('follows').select('creator_id').eq('follower_id',user.id);
+        const ids=new Set((follows||[]).map((x:any)=>x.creator_id));
+        list=list.filter((v:any)=>ids.has(v.creator_id));
+      }
+    }else if(currentTab==='following'){
+      list=[];
     }
+
+    const refs:string[]=[];
+    list.forEach((v:any)=>{
+      if(v.thumbnail_url)refs.push(v.thumbnail_url);
+      if(v.creator?.avatar_url)refs.push(v.creator.avatar_url);
+      if(v.creator?.cover_url)refs.push(v.creator.cover_url);
+    });
+    const resolved=await resolvePrivateMediaRefs(refs);
+    const rank:Record<string,number>={free:0,basic:1,vip:2,exclusive:3};
+    list=list.map((v:any)=>{
+      const required=rank[v.required_tier||'vip']||0;
+      const unlocked=!v.is_premium||purchasedIds.has(v.id)||(subscriptionRank.get(v.creator_id)||0)>=required;
+      return {
+        ...v,
+        has_unlocked:unlocked,
+        thumbnail_url:resolved.get(v.thumbnail_url)||v.thumbnail_url,
+        creator:v.creator?{
+          ...v.creator,
+          avatar_url:resolved.get(v.creator.avatar_url)||v.creator.avatar_url,
+          cover_url:resolved.get(v.creator.cover_url)||v.creator.cover_url
+        }:v.creator
+      };
+    });
     setVideos(list);
   };
 
@@ -67,9 +110,8 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
   }, [currentTab]);
 
   useEffect(() => {
-    const unsub = dbService.subscribe(() => {
-      void refreshFeed();
-    });
+    if(isSupabaseConfigured) return;
+    const unsub = dbService.subscribe(() => { void refreshFeed(); });
     return unsub;
   }, [currentTab]);
 
