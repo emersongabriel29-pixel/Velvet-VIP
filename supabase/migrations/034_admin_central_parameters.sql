@@ -1,0 +1,17 @@
+alter table public.app_content_settings
+ add column if not exists comments_enabled boolean not null default true,
+ add column if not exists sharing_enabled boolean not null default true,
+ add column if not exists creator_signup_enabled boolean not null default true,
+ add column if not exists ads_enabled boolean not null default true,
+ add column if not exists ppv_enabled boolean not null default true,
+ add column if not exists tips_enabled boolean not null default true,
+ add column if not exists creator_subscriptions_enabled boolean not null default true,
+ add column if not exists maintenance_mode boolean not null default false,
+ add column if not exists require_creator_approval boolean not null default true,
+ add column if not exists require_age_confirmation boolean not null default true,
+ add column if not exists max_highlights_per_creator int not null default 20 check (max_highlights_per_creator between 1 and 100),
+ add column if not exists max_live_minutes int not null default 240 check (max_live_minutes between 1 and 1440),
+ add column if not exists max_daily_posts int not null default 20 check (max_daily_posts between 1 and 500),
+ add column if not exists min_withdrawal_amount numeric(10,2) not null default 50 check (min_withdrawal_amount >= 0),
+ add column if not exists creator_min_price numeric(10,2) not null default 5 check (creator_min_price >= 0),
+ add column if not exists creator_max_price numeric(10,2) not null default 999.90 check (creator_max_price >= creator_min_price);
