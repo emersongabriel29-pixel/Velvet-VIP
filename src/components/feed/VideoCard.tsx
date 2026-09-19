@@ -20,6 +20,7 @@ import { dbService } from '../../services/db';
 import { getVideoPlaybackOptions, PlaybackSource } from '../../services/media';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import { AdaptiveVideo } from '../common/AdaptiveVideo';
 
 interface VideoCardProps {
   video: Video;
@@ -60,6 +61,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [quality,setQuality]=useState('Automático');
   const [playbackSources,setPlaybackSources]=useState<PlaybackSource[]>([]);
   const [playbackUrl, setPlaybackUrl] = useState(video.video_url.startsWith('storage://') ? '' : video.video_url);
+  const [playbackType,setPlaybackType]=useState('video/mp4');
   const lastTapRef = useRef<number>(0);
   const canPlayback = !video.is_premium || Boolean(video.has_unlocked);
   const isLocked = video.is_premium && !video.has_unlocked;
@@ -98,12 +100,15 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     setPlaybackSources([]);
     setQuality('Automático');
     setPlaybackUrl(video.video_url.startsWith('storage://') ? '' : video.video_url);
+    setPlaybackType('video/mp4');
     if (video.video_url.startsWith('storage://') && canPlayback) {
       getVideoPlaybackOptions(video.id).then(data=>{
         if(cancelled)return;
-        setPlaybackUrl(data.url);
+        const automatic=data.sources.find(source=>source.label==='Automático')||data.sources[0];
+        setPlaybackUrl(automatic?.url||data.url);
+        setPlaybackType(automatic?.type||'video/mp4');
         setPlaybackSources(data.sources);
-      }).catch(()=>{if(!cancelled){setPlaybackUrl('');setPlaybackSources([]);}});
+      }).catch(()=>{if(!cancelled){setPlaybackUrl('');setPlaybackType('video/mp4');setPlaybackSources([]);}});
     } else if(!video.video_url.startsWith('storage://') && video.video_url){
       setPlaybackSources([{label:'Automático',height:0,url:video.video_url,type:'video/mp4'}]);
     }
@@ -232,9 +237,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         className="w-full h-full relative cursor-pointer select-none"
         onClick={handleScreenClick}
       >
-        <video
+        <AdaptiveVideo
           ref={videoRef}
-          src={playbackUrl || undefined}
+          sourceUrl={playbackUrl || undefined}
+          sourceType={playbackType}
           poster={video.thumbnail_url}
           loop
           playsInline
@@ -245,7 +251,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           }`}
         />
 
-        {(video.content_kind === 'long' || video.duration_seconds >= 60) && <div className="absolute top-16 sm:top-4 left-4 z-30 flex items-center gap-2"><div className="rounded-lg bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-md">PRÉVIA • 15s • VÍDEO LONGO</div>{playbackSources.length>1&&<div className="relative"><button onClick={(e)=>{e.stopPropagation();setShowQuality(v=>!v)}} className="rounded-lg bg-black/60 p-1.5 text-white backdrop-blur-md" title="Qualidade"><Settings className="h-3.5 w-3.5"/></button>{showQuality&&<div onClick={e=>e.stopPropagation()} className="absolute left-0 mt-1 w-32 rounded-xl border border-white/10 bg-black/95 p-1 shadow-xl">{playbackSources.map(src=><button key={src.label} onClick={()=>{setQuality(src.label);setPlaybackUrl(src.url);setShowQuality(false)}} className={`block w-full rounded-lg px-2 py-1.5 text-left text-[10px] ${quality===src.label?'bg-rose-600 text-white':'text-zinc-300 hover:bg-white/10'}`}>{src.label}</button>)}</div>}</div>}</div>}
+        {(video.content_kind === 'long' || video.duration_seconds >= 60) && <div className="absolute top-16 sm:top-4 left-4 z-30 flex items-center gap-2"><div className="rounded-lg bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-md">PRÉVIA • 15s • VÍDEO LONGO</div>{playbackSources.length>1&&<div className="relative"><button onClick={(e)=>{e.stopPropagation();setShowQuality(v=>!v)}} className="rounded-lg bg-black/60 p-1.5 text-white backdrop-blur-md" title="Qualidade"><Settings className="h-3.5 w-3.5"/></button>{showQuality&&<div onClick={e=>e.stopPropagation()} className="absolute left-0 mt-1 w-32 rounded-xl border border-white/10 bg-black/95 p-1 shadow-xl">{playbackSources.map(src=><button key={src.label} onClick={()=>{setQuality(src.label);setPlaybackUrl(src.url);setPlaybackType(src.type);setShowQuality(false)}} className={`block w-full rounded-lg px-2 py-1.5 text-left text-[10px] ${quality===src.label?'bg-rose-600 text-white':'text-zinc-300 hover:bg-white/10'}`}>{src.label}</button>)}</div>}</div>}</div>}
 
         {/* Double-tap heart burst animation */}
         {showHeartBurst && (
