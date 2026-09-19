@@ -27,5 +27,11 @@ jobs:
       - name: Automated contract tests
         run: npm test
 
+      - name: FFmpeg media integration
+        run: npm run test:media
+
+      - name: Build media worker image
+        run: docker build -f workers/media/Dockerfile -t velvet-media-worker:ci .
+
       - name: Production build
         run: npm run build
