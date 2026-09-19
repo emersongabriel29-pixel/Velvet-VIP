@@ -23,3 +23,18 @@ The playback Edge Function signs only managed storage references or HTTPS hosts 
 
 ## Live playback contract
 Provider room IDs and playback references are stored in the private schema. The public live row exposes only non-secret status/provider metadata and quality labels. A server adapter calls `attach_streaming_room` and `set_live_playback_sources`; viewers obtain authorized sources through `get-live-playback` after 18+ and plan checks.
+
+
+## Cloudflare Stream adapter
+The repository includes an optional concrete adapter selected with `STREAMING_PROVIDER=cloudflare`.
+Required Supabase Edge secrets:
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_STREAM_API_TOKEN` with Stream write/read permissions
+- `STREAMING_ALLOWED_HOSTS` containing the exact `customer-<CODE>.cloudflarestream.com` playback host
+- `ALLOWED_ORIGINS` with the Velvet web origins
+
+Long videos remain `processing` until `start-media-processing` hands the private signed source to Cloudflare Stream and `sync-media-processing` confirms `readyToStream`. Cloudflare assets are created with signed URLs required.
+
+Lives are created through `create-live-input`; RTMPS/SRT ingest credentials are returned only to the authenticated, verified creator and are never persisted. `sync-live-input` moves the Velvet session to `live` only after the provider reports an active connection.
+
+The playback Edge Functions issue short-lived provider tokens after Velvet entitlement checks. Do not add Cloudflare API tokens to Vite/browser variables.
