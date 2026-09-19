@@ -39,6 +39,11 @@ export interface Creator {
   category: string;
   identity_status?: 'pending' | 'verified' | 'rejected' | 'suspended';
   created_at: string;
+  level?: 1|2|3|4|5;
+  level_score?: number;
+  feed_boost?: number;
+  level_highlights_limit?: number;
+  level_updated_at?: string;
 }
 
 export interface Video {
