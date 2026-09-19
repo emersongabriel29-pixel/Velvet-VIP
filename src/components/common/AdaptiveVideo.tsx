@@ -1,5 +1,5 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import Hls from 'hls.js';
+import Hls, { ErrorTypes } from 'hls.js';
 
 type AdaptiveVideoProps = Omit<React.VideoHTMLAttributes<HTMLVideoElement>, 'src'> & {
   sourceUrl?: string;
@@ -52,11 +52,11 @@ export const AdaptiveVideo = forwardRef<HTMLVideoElement, AdaptiveVideoProps>(
           hls.attachMedia(video);
           hls.on(Hls.Events.ERROR, (_event, data) => {
             if (disposed || !data.fatal || !hls) return;
-            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            if (data.type === ErrorTypes.NETWORK_ERROR) {
               hls.startLoad();
               return;
             }
-            if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            if (data.type === ErrorTypes.MEDIA_ERROR) {
               hls.recoverMediaError();
               return;
             }
