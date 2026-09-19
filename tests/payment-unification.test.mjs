@@ -27,3 +27,12 @@ test('canonical webhook settles and reverses PPV idempotently',()=>{
   assert.match(webhook,/financial_transactions/);
   assert.match(webhook,/provider_reference/);
 });
+
+
+test('Mercado Pago webhook accepts second or millisecond timestamps and normalizes data.id',()=>{
+  assert.match(webhook,/toLowerCase\(\)/);
+  assert.match(webhook,/tsValue>10_000_000_000\?Math\.floor\(tsValue\/1000\):tsValue/);
+  assert.match(webhook,/if\(dataId\)manifest\.push/);
+  assert.match(webhook,/if\(requestId\)manifest\.push/);
+  assert.match(webhook,/if\(tsRaw\)manifest\.push/);
+});
