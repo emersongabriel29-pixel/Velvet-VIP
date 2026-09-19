@@ -39,13 +39,38 @@ Deno.serve(async (req) => {
     return json({error:'Integridade do pagamento inválida.'},409);
   }
   const eventType = String(payload.type || 'payment');
+  const eventKey = `${paymentId}:${String(payment.status || 'unknown')}`;
   const { error: eventError } = await admin.from('payment_events').insert({
-    gateway: 'mercadopago', gateway_event_id: String(paymentId), payment_id: String(paymentId),
+    gateway: 'mercadopago', gateway_event_id: eventKey, payment_id: String(paymentId),
     event_type: eventType, status: 'received', payload
   });
   if (eventError?.code === '23505') return json({ ok: true, duplicate: true });
+
+  if (payment.status === 'refunded' || payment.status === 'charged_back') {
+    if (session.kind === 'creator_plan') {
+      const { data: plan } = await admin.from('creator_plans').select('creator_id').eq('id', session.reference_id).maybeSingle();
+      if (plan?.creator_id) {
+        await admin.rpc('reverse_creator_credit',{p_creator_id:plan.creator_id,p_provider:'mercadopago',p_reference_id:String(paymentId)});
+        await admin.from('creator_subscriptions').update({status:'cancelled'}).eq('user_id',session.user_id).eq('creator_plan_id',session.reference_id);
+        await admin.from('subscriptions').update({status:'cancelled'}).eq('user_id',session.user_id).eq('creator_id',plan.creator_id);
+      }
+    } else if (session.kind === 'tip') {
+      const creatorId=session.metadata?.creator_id;
+      if (creatorId) {
+        await admin.rpc('reverse_creator_credit',{p_creator_id:creatorId,p_provider:'mercadopago',p_reference_id:String(paymentId)});
+        await admin.from('creator_tips').update({status:'refunded'}).eq('payment_gateway_id',String(paymentId));
+      }
+    } else if (session.kind === 'platform_plan') {
+      const {data:freePlan}=await admin.from('platform_plans').select('id').eq('slug','gratis').maybeSingle();
+      const {data:profile}=await admin.from('profiles').select('platform_plan_id').eq('id',session.user_id).maybeSingle();
+      if(freePlan?.id && profile?.platform_plan_id===session.reference_id) await admin.from('profiles').update({platform_plan_id:freePlan.id}).eq('id',session.user_id);
+    }
+    await admin.from('checkout_sessions').update({status:'refunded',updated_at:new Date().toISOString()}).eq('id',sessionId);
+    await admin.from('payment_events').update({status:'processed',processed_at:new Date().toISOString()}).eq('gateway','mercadopago').eq('gateway_event_id',eventKey);
+    return json({ok:true,status:payment.status});
+  }
   if (payment.status !== 'approved') {
-    await admin.from('checkout_sessions').update({ status: payment.status === 'refunded' ? 'refunded' : 'pending', updated_at: new Date().toISOString() }).eq('id', sessionId);
+    await admin.from('checkout_sessions').update({ status: 'pending', updated_at: new Date().toISOString() }).eq('id', sessionId);
     return json({ ok: true, status: payment.status });
   }
 
@@ -53,22 +78,52 @@ Deno.serve(async (req) => {
   if (session.kind === 'platform_plan') {
     await admin.from('profiles').update({ platform_plan_id: session.reference_id }).eq('id', session.user_id);
   } else if (session.kind === 'creator_plan') {
-    const { data: plan } = await admin.from('creator_plans').select('creator_id,price,tier,billing_period').eq('id', session.reference_id).single();
-    if (plan) await admin.from('creator_subscriptions').upsert({
-      user_id: session.user_id, creator_id: plan.creator_id, creator_plan_id: session.reference_id,
-      status: 'active', amount_paid: plan.price, creator_amount: Number((plan.price * 0.85).toFixed(2)),
-      platform_amount: Number((plan.price * 0.15).toFixed(2)), billing_period: plan.billing_period,
-      current_period_end: new Date(Date.now() + (plan.billing_period === 'annual' ? 365 : plan.billing_period === 'semiannual' ? 180 : 30) * 86400000).toISOString()
-    }, { onConflict: 'user_id,creator_id' });
+    const { data: plan } = await admin.from('creator_plans').select('creator_id,price,tier,billing_period,creator_share_percent,platform_fee_percent').eq('id', session.reference_id).single();
+    if (plan) {
+      const days=plan.billing_period==='annual'?365:plan.billing_period==='semiannual'?180:30;
+      const end=new Date(Date.now()+days*86400000).toISOString();
+      const creatorAmount=Number((Number(plan.price)*Number(plan.creator_share_percent)/100).toFixed(2));
+      const platformAmount=Number((Number(plan.price)-creatorAmount).toFixed(2));
+      await admin.from('creator_subscriptions').upsert({
+        user_id:session.user_id,creator_id:plan.creator_id,creator_plan_id:session.reference_id,
+        status:'active',amount_paid:plan.price,creator_amount:creatorAmount,platform_amount:platformAmount,
+        billing_period:plan.billing_period,current_period_end:end
+      },{onConflict:'user_id,creator_id'});
+      await admin.from('subscriptions').upsert({
+        user_id:session.user_id,creator_id:plan.creator_id,plan_tier:plan.tier,amount:plan.price,status:'active',current_period_end:end
+      },{onConflict:'user_id,creator_id'});
+      await admin.rpc('credit_creator',{
+        p_creator_id:plan.creator_id,p_gross:Number(plan.price),p_reference_id:String(paymentId),
+        p_metadata:{provider:'mercadopago',kind:'subscription',checkout_session_id:sessionId,share_percent:Number(plan.creator_share_percent)}
+      });
+      await admin.from('financial_transactions').upsert({
+        user_id:session.user_id,creator_id:plan.creator_id,checkout_session_id:sessionId,kind:'subscription',
+        gross_amount:Number(plan.price),creator_amount:creatorAmount,platform_amount:platformAmount,state:'available',
+        provider:'mercadopago',provider_reference:String(paymentId)
+      },{onConflict:'provider,provider_reference'});
+    }
   } else if (session.kind === 'tip') {
     const creatorId = session.metadata?.creator_id;
-    if (creatorId) await admin.from('creator_tips').insert({
-      sender_id: session.user_id, creator_id: creatorId, amount: session.amount,
-      platform_fee: Number((session.amount * 0.10).toFixed(2)),
-      creator_amount: Number((session.amount * 0.90).toFixed(2)),
-      message: session.metadata?.message || '', status: 'paid', payment_gateway_id: String(paymentId)
-    });
+    if (creatorId) {
+      const {data:creator}=await admin.from('creators').select('tip_share_percent').eq('id',creatorId).single();
+      const share=Number(creator?.tip_share_percent||90);
+      const creatorAmount=Number((Number(session.amount)*share/100).toFixed(2));
+      const platformAmount=Number((Number(session.amount)-creatorAmount).toFixed(2));
+      await admin.from('creator_tips').upsert({
+        sender_id:session.user_id,creator_id:creatorId,amount:session.amount,platform_fee:platformAmount,
+        creator_amount:creatorAmount,message:session.metadata?.message||'',status:'paid',payment_gateway_id:String(paymentId)
+      },{onConflict:'payment_gateway_id'});
+      await admin.rpc('credit_creator',{
+        p_creator_id:creatorId,p_gross:Number(session.amount),p_reference_id:String(paymentId),
+        p_metadata:{provider:'mercadopago',kind:'tip',checkout_session_id:sessionId,share_percent:share}
+      });
+      await admin.from('financial_transactions').upsert({
+        user_id:session.user_id,creator_id:creatorId,checkout_session_id:sessionId,kind:'tip',
+        gross_amount:Number(session.amount),creator_amount:creatorAmount,platform_amount:platformAmount,state:'available',
+        provider:'mercadopago',provider_reference:String(paymentId)
+      },{onConflict:'provider,provider_reference'});
+    }
   }
-  await admin.from('payment_events').update({ status: 'processed', processed_at: new Date().toISOString() }).eq('gateway', 'mercadopago').eq('gateway_event_id', String(paymentId));
+  await admin.from('payment_events').update({ status: 'processed', processed_at: new Date().toISOString() }).eq('gateway', 'mercadopago').eq('gateway_event_id', eventKey);
   return json({ ok: true, status: 'approved' });
 });
