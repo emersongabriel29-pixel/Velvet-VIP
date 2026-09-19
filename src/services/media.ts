@@ -61,16 +61,25 @@ export async function uploadCreatorVideo(input:{
 }
 
 export type PlaybackSource={label:string;height:number;url:string;type:string};
-export type VideoPlayback={url:string;sources:PlaybackSource[];adaptive:boolean;expires_in:number};
+export type VideoPlayback={url:string;sources:PlaybackSource[];adaptive:boolean;adaptiveManifest?:string;expires_in:number};
 
 export async function getVideoPlaybackOptions(videoId:string):Promise<VideoPlayback>{
   if(!supabase) throw new Error('Supabase não configurado.');
   const {data,error}=await supabase.functions.invoke('get-video-url',{body:{video_id:videoId}});
   if(error||!data?.url) throw new Error(data?.error||error?.message||'Não foi possível liberar o vídeo.');
+  const adaptiveManifest=typeof data.adaptive_manifest==='string'&&data.adaptive_manifest?data.adaptive_manifest:undefined;
+  const rawSources:Array<PlaybackSource>=Array.isArray(data.sources)&&data.sources.length
+    ? data.sources
+    : [{label:'Automático',height:0,url:data.url,type:'video/mp4'}];
+  const renditions=rawSources.filter(source=>source.label!=='Automático');
+  const sources:PlaybackSource[]=adaptiveManifest
+    ? [{label:'Automático',height:0,url:adaptiveManifest,type:'application/vnd.apple.mpegurl'},...renditions]
+    : rawSources;
   return {
-    url:data.url,
-    sources:Array.isArray(data.sources)&&data.sources.length?data.sources:[{label:'Automático',height:0,url:data.url,type:'video/mp4'}],
-    adaptive:Boolean(data.adaptive),
+    url:adaptiveManifest||data.url,
+    sources,
+    adaptive:Boolean(adaptiveManifest||data.adaptive),
+    adaptiveManifest,
     expires_in:Number(data.expires_in||120)
   };
 }
