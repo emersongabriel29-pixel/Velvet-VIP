@@ -45,9 +45,13 @@ export async function uploadCreatorVideo(input:{
       premium_price:input.isPremium?input.premiumPrice:0,
       required_tier:input.isPremium?input.requiredTier:'free',
       category:input.category,hashtags:input.hashtags,is_draft:input.isDraft,
-      access_type:input.accessType,content_level:'sensual',anonymous_access:input.anonymousAccess
+      access_type:input.accessType,content_level:'sensual',anonymous_access:input.anonymousAccess,
+      source_storage_path:videoPath,media_status:'ready',processing_status:input.contentKind==='long'?'queued':'ready'
     }).select('id').single();
     if(inserted.error||!inserted.data) throw new Error(inserted.error?.message||'Falha ao registrar o vídeo.');
+    if(input.contentKind==='long'){
+      await supabase.from('media_processing_jobs').insert({video_id:inserted.data.id,status:'queued',source_path:videoPath}).then(()=>{});
+    }
     return {id:inserted.data.id,storagePath:videoPath};
   }catch(err){
     await supabase.storage.from('velvet-media').remove([videoPath]);
@@ -55,11 +59,23 @@ export async function uploadCreatorVideo(input:{
   }
 }
 
-export async function getPlayableVideoUrl(videoId:string):Promise<string>{
+export type PlaybackSource={label:string;height:number;url:string;type:string};
+export type VideoPlayback={url:string;sources:PlaybackSource[];adaptive:boolean;expires_in:number};
+
+export async function getVideoPlaybackOptions(videoId:string):Promise<VideoPlayback>{
   if(!supabase) throw new Error('Supabase não configurado.');
   const {data,error}=await supabase.functions.invoke('get-video-url',{body:{video_id:videoId}});
   if(error||!data?.url) throw new Error(data?.error||error?.message||'Não foi possível liberar o vídeo.');
-  return data.url;
+  return {
+    url:data.url,
+    sources:Array.isArray(data.sources)&&data.sources.length?data.sources:[{label:'Automático',height:0,url:data.url,type:'video/mp4'}],
+    adaptive:Boolean(data.adaptive),
+    expires_in:Number(data.expires_in||120)
+  };
+}
+
+export async function getPlayableVideoUrl(videoId:string):Promise<string>{
+  return (await getVideoPlaybackOptions(videoId)).url;
 }
 
 
