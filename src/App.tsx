@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { FeedTab } from './types';
 import { Header } from './components/common/Header';
@@ -40,9 +40,19 @@ const VelvetVipApp: React.FC = () => {
   const [lgpdModalOpen, setLgpdModalOpen] = useState(false);
   const [productTool, setProductTool] = useState<ProductTool>('search');
 
-  const handleSelectCreator = (creatorId: string) => { setSelectedCreatorId(creatorId); setActiveView('profile'); };
+  useEffect(()=>{
+    const syncHash=()=>{
+      const match=window.location.hash.match(/^#creator=([0-9a-f-]{36})$/i);
+      if(match){setSelectedCreatorId(match[1]);setActiveView('profile');}
+    };
+    syncHash();
+    window.addEventListener('hashchange',syncHash);
+    return()=>window.removeEventListener('hashchange',syncHash);
+  },[]);
+
+  const handleSelectCreator = (creatorId: string) => { setSelectedCreatorId(creatorId); window.history.replaceState(null,'',`#creator=${creatorId}`); setActiveView('profile'); };
   const handleSelectVideo = (_videoId: string) => { setActiveView('feed'); };
-  const handleOpenProfile = () => { setSelectedCreatorId(undefined); setActiveView('profile'); };
+  const handleOpenProfile = () => { setSelectedCreatorId(undefined); if(window.location.hash.startsWith('#creator=')) window.history.replaceState(null,'',window.location.pathname+window.location.search); setActiveView('profile'); };
 
   return <div id="velvet-vip-root" className="min-h-screen overflow-x-hidden bg-[#09090b] font-sans text-zinc-100 selection:bg-rose-500 selection:text-white">
     <AgeVerificationModal />
