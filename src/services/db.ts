@@ -1355,7 +1355,13 @@ class DatabaseService {
 
   // Public notification stream for visitors. It never exposes private account,
   // purchase, subscription or interaction notifications.
+  public markVisitorNotificationsAsRead() {
+    setStored('visitor_notifications_read_at', new Date().toISOString());
+    this.notify();
+  }
+
   public getVisitorNotifications(): Notification[] {
+    const readAt = getStored<string | null>('visitor_notifications_read_at', null);
     const creators = this.creators
       .filter(c => c.is_approved)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -1376,7 +1382,7 @@ class DatabaseService {
       title: 'Novo criador',
       message: 'começou a publicar no Velvet VIP.',
       target_id: c.id,
-      read: false,
+      read: readAt ? new Date(c.created_at) <= new Date(readAt) : false,
       created_at: c.created_at,
     }));
 
@@ -1393,7 +1399,7 @@ class DatabaseService {
         message: 'publicou um novo conteúdo' + (v.access_type === 'free' || !v.is_premium ? ' gratuito.' : ' exclusivo para assinantes.'),
         target_id: creator?.id,
         target_video_id: v.id,
-        read: false,
+        read: readAt ? new Date(v.created_at) <= new Date(readAt) : false,
         created_at: v.created_at,
       } as Notification;
     });
@@ -1411,6 +1417,11 @@ class DatabaseService {
     };
     this.notifications.unshift(newNotif);
     setStored('notifications', this.notifications);
+    this.notify();
+  }
+
+  public markVisitorNotificationsAsRead() {
+    setStored('visitor_notifications_read_at', new Date().toISOString());
     this.notify();
   }
 
