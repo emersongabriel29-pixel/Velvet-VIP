@@ -186,11 +186,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     return true;
   });
 
-  if (isOwnProfile && isEditingBio) {
-    const isVipMember=!creator && currentUser.platform_plan_slug==='vip';
+  const isVipMember=!creator && currentUser.platform_plan_slug==='vip';
   const pageTitle=creator?pageCopy.creator_title:(isVipMember?pageCopy.vip_title:pageCopy.member_title);
   const pageSubtitle=creator?pageCopy.creator_subtitle:(isVipMember?pageCopy.vip_subtitle:pageCopy.member_subtitle);
 
+  if (isOwnProfile && isEditingBio) {
   return (
       <div id="profile-settings-screen" className="min-h-screen bg-[#09090b] text-white pt-16 pb-24"><div className="mb-4 rounded-2xl border border-rose-500/20 bg-rose-950/10 px-4 py-3"><p className="text-sm font-black text-white">{pageTitle}</p><p className="mt-1 text-xs text-zinc-400">{pageSubtitle}</p></div>
         <div className="mx-auto max-w-2xl px-4 sm:px-6">
@@ -218,7 +218,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-white pt-14 pb-20 max-w-4xl mx-auto px-3 sm:px-6">
+    <div className="min-h-screen bg-[#09090b] text-white pt-14 pb-20 max-w-4xl mx-auto px-3 sm:px-6"><div className="mb-4 rounded-2xl border border-rose-500/20 bg-rose-950/10 px-4 py-3"><p className="text-sm font-black text-white">{pageTitle}</p><p className="mt-1 text-xs text-zinc-400">{pageSubtitle}</p></div>
       {/* Cover Banner */}
       <div className="relative h-44 sm:h-56 rounded-3xl overflow-hidden bg-gradient-to-r from-rose-950/60 via-zinc-900 to-amber-950/40 border border-zinc-800 shadow-xl mb-16">
         {coverPreview && (
