@@ -24,7 +24,7 @@ test('legacy checkout is no longer wildcard CORS and is rate limited',()=>{
 });
 test('legacy webhook requires HMAC freshness and amount integrity',()=>{
   assert.match(legacyWebhook,/MERCADOPAGO_WEBHOOK_SECRET/);
-  assert.match(legacyWebhook,/Math\.abs\(now-ts\)>300/);
+  assert.match(legacyWebhook,/Math\.abs\(now-tsSeconds\)>300/);
   assert.match(legacyWebhook,/transaction_amount/);
   assert.match(legacyWebhook,/currency!==\s*'BRL'/);
 });
