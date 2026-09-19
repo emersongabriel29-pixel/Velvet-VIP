@@ -1,12 +1,15 @@
 -- Production readiness: safe creator payout request.
-create or replace function public.request_creator_withdrawal(
+create schema if not exists private;
+grant usage on schema private to authenticated,service_role;
+
+create or replace function private.request_creator_withdrawal(
   p_amount numeric,
   p_pix_key text,
   p_pix_key_type text
 ) returns uuid
 language plpgsql
 security definer
-set search_path=public
+set search_path=public,private
 as $$
 declare
   v_uid uuid := auth.uid();
@@ -24,7 +27,7 @@ begin
   if not found then raise exception 'creator_not_approved'; end if;
   if coalesce(v_creator.identity_status,'pending') <> 'verified' then raise exception 'identity_verification_required'; end if;
   if v_creator.payout_hold_until is not null and v_creator.payout_hold_until > now() then raise exception 'payout_temporarily_held'; end if;
-  if public.has_active_restriction('payout') then raise exception 'payout_restricted'; end if;
+  if private.has_active_restriction('payout') then raise exception 'payout_restricted'; end if;
 
   select coalesce(min_withdrawal_amount,50) into v_min
   from public.app_content_settings where id='global';
@@ -40,7 +43,7 @@ begin
   insert into public.creator_balance(creator_id,available_amount,pending_amount,total_withdrawn)
   values(v_creator.id,0,p_amount,0)
   on conflict(creator_id) do update
-    set available_amount=public.creator_balance.available_amount-p_amount,
+    set available_amount=greatest(0,public.creator_balance.available_amount-p_amount),
         pending_amount=public.creator_balance.pending_amount+p_amount,
         updated_at=now();
 
@@ -51,5 +54,11 @@ begin
   return v_id;
 end $$;
 
+revoke all on function private.request_creator_withdrawal(numeric,text,text) from public;
+grant execute on function private.request_creator_withdrawal(numeric,text,text) to authenticated,service_role;
+
+create or replace function public.request_creator_withdrawal(p_amount numeric,p_pix_key text,p_pix_key_type text)
+returns uuid language sql security invoker set search_path=public,private
+as $$select private.request_creator_withdrawal(p_amount,p_pix_key,p_pix_key_type)$$;
 revoke all on function public.request_creator_withdrawal(numeric,text,text) from public,anon;
 grant execute on function public.request_creator_withdrawal(numeric,text,text) to authenticated;
