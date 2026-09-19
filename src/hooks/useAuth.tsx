@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { User, Creator, UserRole } from '../types';
 import { dbService } from '../services/db';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { isDemoMode, supabase } from '../lib/supabase';
 
 interface AuthContextType {
   currentUser: User;
@@ -50,7 +50,7 @@ function mapProfile(profile: any, email = ''): User {
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const demoMode = !isSupabaseConfigured;
+  const demoMode = isDemoMode;
   const [currentUser, setCurrentUser] = useState<User>(() => demoMode ? dbService.getCurrentUser() : guestUser);
   const [currentCreator, setCurrentCreator] = useState<Creator | undefined>(() => demoMode ? dbService.getCreatorByUserId(dbService.getCurrentUser().id) : undefined);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => demoMode);
@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    if (demoMode || !supabase) {
+    if (demoMode) {
       const unsub = dbService.subscribe(() => {
         const u = dbService.getCurrentUser();
         setCurrentUser(u);
@@ -83,6 +83,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAllUsers(dbService.getAllUsers());
       });
       return unsub;
+    }
+    if (!supabase) {
+      setIsAuthenticated(false); setCurrentUser(guestUser); setCurrentCreator(undefined); setAllUsers([]);
+      return;
     }
 
     let mounted = true;
@@ -114,9 +118,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       dbService.setCurrentUser(found.id);
       return true;
     }
-    if (!supabase) return false;
+    if (!supabase) throw new Error('Backend de autenticação indisponível.');
     const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pass });
     if (error || !data.user) return false;
+    if (!data.user.email_confirmed_at) {
+      await supabase.auth.signOut();
+      throw new Error('Confirme seu e-mail antes de entrar.');
+    }
     return Boolean(await loadSupabaseProfile(data.user.id, data.user.email || email));
   };
 
