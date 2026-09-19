@@ -235,7 +235,7 @@ export interface Notification {
   sender_id?: string;
   sender_name?: string;
   sender_avatar?: string;
-  type: 'like' | 'comment' | 'follow' | 'subscription' | 'purchase' | 'premium_unlocked' | 'system' | 'payout';
+  type: 'like' | 'comment' | 'follow' | 'subscription' | 'purchase' | 'premium_unlocked' | 'system' | 'payout' | 'new_content' | 'new_creator';
   title: string;
   message: string;
   target_id?: string;
