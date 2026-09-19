@@ -33,12 +33,12 @@ Verificado em 19/09/2026 contra o repositório (base `667ce08`) e o projeto Supa
 Aplicada a migration `20260919162845_atomic_payment_settlement.sql`.
 A função `settle_verified_payment` é `SECURITY INVOKER` e executável somente por `service_role` (além do proprietário do banco). Anon e authenticated não têm EXECUTE.
 
-Atualizações implantadas nesta revisão: `payment-webhook` v5, `create-checkout` v3 e `get-video-url` v4. A reprodução pública usa autenticação no corpo da função: somente conteúdo gratuito, sensual, publicado, aprovado e pronto dispensa login. Conteúdo restrito exige sessão e autorização. Os endpoints legados de pagamento foram preservados para compatibilidade e não foram certificados nesta revisão.
+Atualizações implantadas nesta revisão: `payment-webhook` v5, `create-checkout` v3 e `get-video-url` v5. A reprodução pública usa autenticação no corpo da função: somente conteúdo gratuito, sensual, publicado, aprovado e pronto dispensa login. Conteúdo restrito exige sessão e autorização. Os endpoints legados de pagamento foram preservados para compatibilidade e não foram certificados nesta revisão.
 
 ## Verificações executadas
 
 - TypeScript e build Vite aprovados.
-- 70 testes Node aprovados, incluindo execução dos handlers HTTP com clientes/provedor simulados.
+- 71 testes Node aprovados, incluindo execução dos handlers HTTP com clientes/provedor simulados.
 - `tests/sql/payment-settlement.sql` executado no banco real dentro de transação com ROLLBACK: valor adulterado, aprovação, duplicidade, evento atrasado, reembolso, recompra, falha parcial, retry, assinatura e chargeback.
 - Fixtures SQL foram desfeitas; não houve cobrança, transferência ou reembolso real.
 - Smoke HTTP após implantação: vídeo sem ID retorna 400, checkout sem sessão retorna 401; webhook retorna 503 "Webhook não configurado", comprovando ausência de pelo menos uma credencial necessária (`MERCADOPAGO_ACCESS_TOKEN`/`MERCADOPAGO_WEBHOOK_SECRET`).

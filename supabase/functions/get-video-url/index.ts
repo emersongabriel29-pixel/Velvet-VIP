@@ -22,8 +22,11 @@ Deno.serve(async(req)=>{
   const {data:video}=await admin.from('videos').select('id,video_url,is_premium,creator_id,required_tier,access_type,content_level,anonymous_access,moderation_status,media_status,processing_status,is_draft,is_removed,hls_manifest_path,hls_storage_path').eq('id',videoId).single();
   if(!video) return response(req,{error:'Video not found'},404);
 
-  const {data:owner}=await admin.from('creators').select('user_id').eq('id',video.creator_id).single();
-  if(!owner?.user_id) return response(req,{error:'Creator not found'},404);
+  const {data:owner}=await admin.from('creators').select('user_id,is_approved').eq('id',video.creator_id).single();
+  if(!owner?.user_id || owner.is_approved !== true) return response(req,{error:'Creator unavailable'},404);
+  const {data:ownerProfile,error:ownerError}=await admin.from('profiles').select('is_blocked,is_suspended').eq('id',owner.user_id).single();
+  const ownerRestrictions=await admin.from('account_restrictions').select('id').eq('subject_user_id',owner.user_id).eq('is_active',true).eq('scope','account').lte('starts_at',new Date().toISOString()).or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`).limit(1);
+  if(ownerError || !ownerProfile || ownerProfile.is_blocked || ownerProfile.is_suspended || ownerRestrictions.error || ownerRestrictions.data?.length) return response(req,{error:'Creator unavailable'},403);
   const anonymousAllowed=video.anonymous_access===true&&video.is_premium===false&&video.access_type==='free'&&video.required_tier==='free'&&video.content_level==='sensual'&&isPublishedVideo(video);
   if(!anonymousAllowed){
     const auth=req.headers.get('Authorization');

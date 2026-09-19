@@ -41,11 +41,11 @@ test('expired signature is rejected before provider lookup',async()=>{
   assert.equal((await handler(await notification('123','123','1000'))).status,401);
 });
 
-function videoClient(video, { subscription=null, purchase=null, user='viewer' }={}) {
+function videoClient(video, { subscription=null, purchase=null, user='viewer', approved=true }={}) {
   return { auth:{getUser:async()=>({data:{user:{id:user}}})},
     storage:{from:()=>({createSignedUrl:async()=>({data:{signedUrl:'https://example.invalid/signed'}})})},
     from(table) {
-      const rows={videos:video,creators:{user_id:'owner'},profiles:{age_verified:true,birth_date:'1990-01-01',role:'user'},
+      const rows={videos:video,creators:{user_id:'owner',is_approved:approved},profiles:{age_verified:true,birth_date:'1990-01-01',role:'user'},
         purchases:purchase,subscriptions:subscription,account_restrictions:[],media_processing_jobs:null};
       const q={then(resolve){return Promise.resolve({data:rows[table],error:null}).then(resolve)}};
       for(const method of ['select','eq','lte','or','limit','single','maybeSingle','order']) q[method]=()=>q;
@@ -69,3 +69,5 @@ test('VIP subscription does not unlock a separate PPV purchase',async()=>{
   assert.equal((await playback({...published,is_premium:true,access_type:'pay_per_view',required_tier:'vip'},{subscription})).status,403);
 });
 test('completed purchase unlocks PPV',async()=>assert.equal((await playback({...published,is_premium:true,access_type:'pay_per_view',required_tier:'vip'},{purchase:{id:'purchase'}})).status,200));
+
+test('unapproved creator cannot distribute even free published content',async()=>assert.equal((await playback(published,{approved:false})).status,404));
