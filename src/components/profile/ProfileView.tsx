@@ -69,6 +69,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [profileLives, setProfileLives] = useState<any[]>([]);
   const [profileHighlights,setProfileHighlights]=useState<any[]>([]);
   const [selectedHighlight,setSelectedHighlight]=useState<any|null>(null);
+  const [pageCopy,setPageCopy]=useState({member_title:'Membro Velvet VIP',member_subtitle:'Descubra conteúdos e criadores.',vip_title:'Membro VIP',vip_subtitle:'Acesso premium aos seus criadores favoritos.',creator_title:'Creator Studio',creator_subtitle:'Publique, faça lives e monetize sua comunidade.'});
 
   const isOwnProfile = isAuthenticated && (!creatorId || (currentCreator && currentCreator.id === creatorId) || (creator && creator.user_id === currentUser.id));
 
@@ -136,6 +137,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   useEffect(() => {
+    if(isSupabaseConfigured && supabase){supabase.from('app_content_settings').select('member_page_title,member_page_subtitle,vip_page_title,vip_page_subtitle,creator_page_title,creator_page_subtitle').eq('id','global').maybeSingle().then(({data})=>{if(data)setPageCopy({member_title:data.member_page_title||'Membro Velvet VIP',member_subtitle:data.member_page_subtitle||'Descubra conteúdos e criadores.',vip_title:data.vip_page_title||'Membro VIP',vip_subtitle:data.vip_page_subtitle||'Acesso premium aos seus criadores favoritos.',creator_title:data.creator_page_title||'Creator Studio',creator_subtitle:data.creator_page_subtitle||'Publique, faça lives e monetize sua comunidade.'});});}
     if (!creator?.id || !isSupabaseConfigured || !supabase) { setProfileLives([]); return; }
     supabase.from('live_sessions').select('id,title,status,scheduled_at,required_plan').eq('creator_id',creator.id).in('status',['live','scheduled']).order('scheduled_at',{ascending:true}).then(({data})=>setProfileLives(data || []));
     supabase.from('creator_highlights').select('id,title,cover_url,media_url,media_type').eq('creator_id',creator.id).eq('is_active',true).order('sort_order').order('created_at',{ascending:false}).then(async ({data})=>{const rows=await Promise.all((data||[]).map(async h=>({...h,display_url:await getProfileImageUrl(h.cover_url||h.media_url||'')})));setProfileHighlights(rows);});
@@ -185,8 +187,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   });
 
   if (isOwnProfile && isEditingBio) {
-    return (
-      <div id="profile-settings-screen" className="min-h-screen bg-[#09090b] text-white pt-16 pb-24">
+    const isVipMember=!creator && currentUser.platform_plan_slug==='vip';
+  const pageTitle=creator?pageCopy.creator_title:(isVipMember?pageCopy.vip_title:pageCopy.member_title);
+  const pageSubtitle=creator?pageCopy.creator_subtitle:(isVipMember?pageCopy.vip_subtitle:pageCopy.member_subtitle);
+
+  return (
+      <div id="profile-settings-screen" className="min-h-screen bg-[#09090b] text-white pt-16 pb-24"><div className="mb-4 rounded-2xl border border-rose-500/20 bg-rose-950/10 px-4 py-3"><p className="text-sm font-black text-white">{pageTitle}</p><p className="mt-1 text-xs text-zinc-400">{pageSubtitle}</p></div>
         <div className="mx-auto max-w-2xl px-4 sm:px-6">
           <div className="mb-6 flex items-center gap-3 border-b border-zinc-800 pb-5">
             <button type="button" onClick={()=>setIsEditingBio(false)} className="touch-manipulation rounded-xl border border-zinc-800 bg-zinc-900 p-2.5 text-zinc-300 hover:text-white" aria-label="Voltar ao perfil"><ArrowLeft className="h-5 w-5"/></button>
