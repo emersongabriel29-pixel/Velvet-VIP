@@ -6,7 +6,7 @@ const corsFor = (req: Request) => {
   const origin=req.headers.get('Origin')||'';
   return {'Access-Control-Allow-Origin':allowedOrigins.includes(origin)?origin:'','Vary':'Origin','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'};
 };
-const response=(req:Request,data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{...corsFor(req),'Content-Type':'application/json','Cache-Control':'no-store'}});
+const response=(req:Request,data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{...corsFor(req),'Content-Type':'application/json','Cache-Control': 'no-store'}});
 
 Deno.serve(async(req)=>{
   if(req.method==='OPTIONS') return new Response('ok',{headers:corsFor(req)});
