@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Sparkles, TrendingUp, Play, Lock, Heart, Users } from 'lucide-react';
-import { Video } from '../../types';
-import { dbService } from '../../services/db';
+import { Video, Creator } from '../../types';
+import { listCategories, loadExplore } from '../../services/accountData';
 
 interface ExplorePageProps {
   onSelectVideo: (videoId: string) => void;
@@ -14,20 +14,24 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
-  const [categoriesList, setCategoriesList] = useState<string[]>(() => [
-    'Todos',
-    ...dbService.getCategories().map(c => c.name)
-  ]);
+  const [categoriesList, setCategoriesList] = useState<string[]>(['Todos']);
+  const [creators, setCreators] = useState<Creator[]>([]);
+  const [allVideos, setVideos] = useState<Video[]>([]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
-    const unsub = dbService.subscribe(() => {
-      setCategoriesList(['Todos', ...dbService.getCategories().map(c => c.name)]);
-    });
-    return unsub;
+    let active = true;
+    Promise.all([listCategories(), loadExplore()]).then(([categories, result]) => {
+      if (!active) return;
+      setCategoriesList(['Todos', ...categories.map(c => c.name)]);
+      setCreators(result.creators); setVideos(result.videos);
+    }).catch(() => { if (active) setError('Não foi possível carregar o catálogo. Tente novamente.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
-  const creators = dbService.getCreators();
-  const allVideos = dbService.getVideos('foryou');
+
 
   const filteredVideos = allVideos.filter((v) => {
     const matchesCat = selectedCategory === 'Todos' || v.category === selectedCategory;
@@ -35,7 +39,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
     if (!term) return matchesCat;
 
     const matchesTitle = v.title.toLowerCase().includes(term);
-    const matchesDesc = v.description.toLowerCase().includes(term);
+    const matchesDesc = (v.description || '').toLowerCase().includes(term);
     const matchesCreator = v.creator?.display_name.toLowerCase().includes(term) || v.creator?.handle.toLowerCase().includes(term);
     const matchesTags = v.hashtags?.some((t) => t.toLowerCase().includes(term));
 
@@ -44,6 +48,8 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
 
   return (
     <div className="min-h-screen bg-[#09090b] text-white pt-16 pb-20 max-w-5xl mx-auto px-4 sm:px-6">
+      {error && <p role="alert" className="mb-4 text-rose-400">{error}</p>}
+      {loading && <p role="status">Carregando catálogo…</p>}
       {/* Search Input Bar */}
       <div className="relative mb-6">
         <Search className="w-5 h-5 text-zinc-500 absolute left-4 top-1/2 -translate-y-1/2" />
@@ -51,7 +57,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
           type="text"
           placeholder="Buscar vídeos, criadores ou #hashtags..."
           value={searchTerm}
-          onChange={(e) => { setSearchTerm(e.target.value); if (e.target.value.trim().length >= 3) dbService.recordSearch(e.target.value); }}
+          onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-12 pr-4 py-3.5 bg-[#141419] border border-zinc-800 rounded-2xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-rose-500 transition-colors shadow-lg"
         />
       </div>
@@ -63,7 +69,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
             <TrendingUp className="w-4 h-4 text-rose-500" />
             <span>Criadores em Destaque</span>
           </h3>
-          <span className="text-[11px] text-zinc-400">Verificados 18+</span>
+          <span className="text-[11px] text-zinc-400">Perfis aprovados</span>
         </div>
 
         <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-2">

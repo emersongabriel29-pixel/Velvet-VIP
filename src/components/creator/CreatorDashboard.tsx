@@ -50,9 +50,6 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   const [payoutMessage, setPayoutMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Subscription plan prices state
-  const [basicPrice, setBasicPrice] = useState(29.90);
-  const [vipPrice, setVipPrice] = useState(59.90);
-  const [plansSaved, setPlansSaved] = useState(false);
 
   const creator: Creator = currentCreator || {
     id: 'cr-default',
@@ -64,11 +61,11 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
     verified: true,
     subscription_price_basic: 29.90,
     subscription_price_vip: 59.90,
-    total_followers: 12450,
-    total_likes: 84200,
-    total_views: 450000,
-    wallet_balance: 3840.50,
-    total_earnings: 12540.00,
+    total_followers: 0,
+    total_likes: 0,
+    total_views: 0,
+    wallet_balance: 0,
+    total_earnings: 0,
     created_at: new Date().toISOString(),
   };
 
@@ -109,8 +106,6 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   useEffect(() => {
     void loadData();
     void loadHighlights();
-    setBasicPrice(creator.subscription_price_basic || 29.90);
-    setVipPrice(creator.subscription_price_vip || 59.90);
   }, [currentCreator]);
 
   const handleDeleteVideo = async (id: string, e: React.MouseEvent) => {
@@ -143,12 +138,6 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
     }
   };
 
-  const handleSavePlans = (e: React.FormEvent) => {
-    e.preventDefault();
-    dbService.updateCreatorPlans(creator.id, basicPrice, vipPrice);
-    setPlansSaved(true);
-    setTimeout(() => setPlansSaved(false), 2500);
-  };
 
   return (
     <div className="min-h-screen bg-[#09090b] text-white pt-16 pb-20 max-w-5xl mx-auto px-4 sm:px-6">
@@ -250,7 +239,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
       </div>
 
       <CreatorAnalyticsPanel creatorId={creator.id} fallback={{ followers: creator.total_followers, views: creator.total_views, likes: creator.total_likes, comments: 0, earnings: creator.total_earnings || 0 }} />
-      <CreatorPlansManager creatorId={creator.id} />
+
 
       {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-zinc-800 pb-3 mb-6 overflow-x-auto no-scrollbar">
@@ -439,63 +428,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
         </div>
       )}
 
-      {/* Tab 3: Subscription Plans Config */}
-      {activeTab === 'plans' && (
-        <div className="max-w-xl space-y-6">
-          <div className="p-6 rounded-3xl bg-[#141419] border border-zinc-800 space-y-4">
-            <div>
-              <h3 className="text-base font-bold text-white font-display">Configurar Preços de Assinatura Mensal</h3>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Defina o valor cobrado mensalmente dos seus membros VIP para acessar seus conteúdos exclusivos.
-              </p>
-            </div>
-
-            {plansSaved && (
-              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Preços atualizados com sucesso!</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSavePlans} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Plano Básico (Mensal em R$):
-                </label>
-                <input
-                  type="number"
-                  step="0.10"
-                  min="9.90"
-                  value={basicPrice}
-                  onChange={(e) => setBasicPrice(parseFloat(e.target.value) || 0)}
-                  className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-xs text-white focus:outline-none focus:border-rose-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Plano VIP Gold (Mensal em R$):
-                </label>
-                <input
-                  type="number"
-                  step="0.10"
-                  min="19.90"
-                  value={vipPrice}
-                  onChange={(e) => setVipPrice(parseFloat(e.target.value) || 0)}
-                  className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-xs text-white focus:outline-none focus:border-rose-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/50 cursor-pointer"
-              >
-                Salvar Novos Preços
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {activeTab === 'plans' && <CreatorPlansManager creatorId={creator.id} />}
 
       {/* Tab 4: Payouts & PIX */}
       {activeTab === 'payouts' && (

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Home, Compass, Plus, Bell, User as UserIcon, ShieldAlert, Grid2X2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { dbService } from '../../services/db';
+import { loadNotifications } from '../../services/accountData';
 
 interface BottomNavProps {
   activeView: string;
@@ -17,7 +17,15 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   onOpenAuthModal,
 }) => {
   const { currentUser, isAuthenticated } = useAuth();
-  const unreadCount = isAuthenticated ? dbService.getNotifications().filter(n => !n.read).length : 0;
+  const [unreadCount, setUnreadCount] = useState(0);
+  useEffect(() => {
+    let active = true; setUnreadCount(0);
+    const refresh = () => { if (isAuthenticated) loadNotifications().then(rows => { if (active) setUnreadCount(rows.filter(n => !n.read).length); }).catch(() => { if (active) setUnreadCount(0); }); };
+    refresh(); const timer = window.setInterval(refresh, 30000);
+    window.addEventListener('velvet-notifications-updated', refresh);
+    window.addEventListener('focus', refresh);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener('velvet-notifications-updated', refresh); window.removeEventListener('focus', refresh); };
+  }, [isAuthenticated, currentUser.id]);
 
   return (
     <nav

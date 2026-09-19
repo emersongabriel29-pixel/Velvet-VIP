@@ -25,8 +25,10 @@ Deno.serve(async (req) => {
   if (limited.error || limited.data !== true) return json(req,{ error: 'Muitas tentativas. Tente novamente em instantes.' }, 429);
   const now = new Date().toISOString();
   const restriction = await admin.from('account_restrictions').select('id').eq('subject_user_id', user.id).eq('is_active', true).in('scope', ['account','purchase']).lte('starts_at', now).or(`ends_at.is.null,ends_at.gt.${now}`).limit(1);
+  if (restriction.error) return json(req,{error:'Não foi possível verificar as restrições.'},503);
   if (restriction.data?.length) return json(req,{ error: 'Conta temporariamente impedida de realizar compras.' }, 403);
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return json(req,{error:'Dados inválidos.'},400);
   const kind = body.kind;
   let amount = 0;
   let description = '';
@@ -40,12 +42,15 @@ Deno.serve(async (req) => {
     description = `Velvet VIP ${plan.name}`;
     referenceId = plan.id;
   } else if (kind === 'creator_plan' && body.planId) {
-    const { data: plan } = await admin.from('creator_plans').select('id,name,price,is_active,creator_id').eq('id', body.planId).single();
+    const { data: plan } = await admin.from('creator_plans').select('id,name,price,is_active,creator_id,tier,billing_period,creator_share_percent').eq('id', body.planId).single();
     if (!plan?.is_active) return json(req,{ error: 'Plano do criador inválido.' }, 400);
     amount = Number(plan.price);
     description = `Assinatura ${plan.name}`;
     referenceId = plan.id;
     metadata.creator_id = plan.creator_id;
+    metadata.tier = plan.tier;
+    metadata.billing_period = plan.billing_period;
+    metadata.share_percent = Number(plan.creator_share_percent);
   } else if (kind === 'pay_per_view' && body.videoId) {
     const { data: video } = await admin.from('videos')
       .select('id,title,premium_price,is_premium,creator_id,is_removed,is_draft,moderation_status')
@@ -72,6 +77,7 @@ Deno.serve(async (req) => {
     return json(req,{ error: 'Dados de checkout incompletos.' }, 400);
   }
 
+  if (!Number.isFinite(amount) || amount <= 0) return json(req,{error:'Valor inválido.'},400);
   const { data: session, error: sessionError } = await admin.from('checkout_sessions').insert({
     user_id: user.id, kind, reference_id: referenceId, amount, metadata
   }).select('id').single();

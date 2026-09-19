@@ -30,6 +30,7 @@ export async function uploadCreatorVideo(input:{
   if(uploaded.error) throw new Error(`Falha no envio do vídeo: ${uploaded.error.message}`);
 
   let thumbRef='';
+  let registeredVideoId: string | null = null;
   try{
     if(input.thumbnail){
       const thumbPath=`${user.id}/thumbnails/${mediaId}.jpg`;
@@ -49,13 +50,15 @@ export async function uploadCreatorVideo(input:{
       source_storage_path:videoPath,media_status:'ready',processing_status:input.contentKind==='long'?'queued':'ready'
     }).select('id').single();
     if(inserted.error||!inserted.data) throw new Error(inserted.error?.message||'Falha ao registrar o vídeo.');
+    registeredVideoId=inserted.data.id;
     if(input.contentKind==='long'){
       const queued=await supabase.rpc('enqueue_media_processing',{p_video_id:inserted.data.id,p_source_path:videoPath});
       if(queued.error) throw new Error('O vídeo foi enviado, mas não foi possível enfileirar o processamento.');
     }
     return {id:inserted.data.id,storagePath:videoPath};
   }catch(err){
-    await supabase.storage.from('velvet-media').remove([videoPath]);
+    // Once registered, retain the source for retry/recovery; never leave a row pointing to a deleted original.
+    if (!registeredVideoId) await supabase.storage.from('velvet-media').remove([videoPath, ...(thumbRef ? [thumbRef.slice('storage://'.length)] : [])]);
     throw err;
   }
 }

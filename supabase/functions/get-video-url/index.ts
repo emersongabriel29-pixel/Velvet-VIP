@@ -1,3 +1,4 @@
+import { isPublishedVideo, subscriptionAllowsVideo } from '../_shared/video-policy.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') || '').split(',').map(v => v.trim()).filter(Boolean);
@@ -18,12 +19,12 @@ Deno.serve(async(req)=>{
   const videoId=body?.video_id;
   if(typeof videoId!=='string') return response(req,{error:'video_id required'},400);
 
-  const {data:video}=await admin.from('videos').select('id,video_url,is_premium,creator_id,required_tier,access_type,content_level,anonymous_access,moderation_status,media_status,is_draft,is_removed,hls_manifest_path,hls_storage_path').eq('id',videoId).single();
+  const {data:video}=await admin.from('videos').select('id,video_url,is_premium,creator_id,required_tier,access_type,content_level,anonymous_access,moderation_status,media_status,processing_status,is_draft,is_removed,hls_manifest_path,hls_storage_path').eq('id',videoId).single();
   if(!video) return response(req,{error:'Video not found'},404);
 
   const {data:owner}=await admin.from('creators').select('user_id').eq('id',video.creator_id).single();
   if(!owner?.user_id) return response(req,{error:'Creator not found'},404);
-  const anonymousAllowed=video.anonymous_access===true&&video.is_premium===false&&video.access_type==='free'&&video.required_tier==='free'&&video.content_level==='sensual'&&video.moderation_status==='approved'&&video.media_status==='ready'&&video.is_draft===false&&video.is_removed===false;
+  const anonymousAllowed=video.anonymous_access===true&&video.is_premium===false&&video.access_type==='free'&&video.required_tier==='free'&&video.content_level==='sensual'&&isPublishedVideo(video);
   if(!anonymousAllowed){
     const auth=req.headers.get('Authorization');
     if(!auth?.startsWith('Bearer ')) return response(req,{error:'Authentication required'},401);
@@ -31,14 +32,17 @@ Deno.serve(async(req)=>{
     if(authError||!user) return response(req,{error:'Invalid session'},401);
     const {data:profile}=await admin.from('profiles').select('age_verified,birth_date,is_blocked,is_suspended,role').eq('id',user.id).single();
     if(!profile?.age_verified||profile.is_blocked||profile.is_suspended||!profile.birth_date||new Date(profile.birth_date)>new Date(new Date().setFullYear(new Date().getFullYear()-18))) return response(req,{error:'18+ verification required'},403);
-    if(video.is_premium){
+    const privileged = owner.user_id===user.id || profile.role==='admin';
+    if (!isPublishedVideo(video) && (!privileged || video.is_removed || video.media_status!=='ready')) return response(req,{error:'Video unavailable'},403);
+    const restriction = await admin.from('account_restrictions').select('id').eq('subject_user_id', user.id).eq('is_active',true).eq('scope','account').lte('starts_at',new Date().toISOString()).or(`ends_at.is.null,ends_at.gt.${new Date().toISOString()}`).limit(1);
+    if (restriction.error || restriction.data?.length) return response(req,{error:'Account restricted'},403);
+    if(video.is_premium || video.access_type !== 'free' || video.required_tier !== 'free'){
       let entitled=owner.user_id===user.id||profile.role==='admin';
       const {data:purchase}=entitled?{data:null}:await admin.from('purchases').select('id').eq('user_id',user.id).eq('video_id',videoId).eq('status','completed').maybeSingle();
       entitled=entitled||Boolean(purchase);
       if(!entitled){
-        const {data:subscription}=await admin.from('subscriptions').select('plan_tier,current_period_end').eq('user_id',user.id).eq('creator_id',video.creator_id).eq('status','active').maybeSingle();
-        const rank:Record<string,number>={free:0,basic:1,vip:2,exclusive:3};
-        entitled=Boolean(subscription&&new Date(subscription.current_period_end)>new Date()&&rank[subscription.plan_tier]>=rank[video.required_tier||'vip']);
+        const {data:subscription}=await admin.from('subscriptions').select('plan_tier,current_period_end,status').eq('user_id',user.id).eq('creator_id',video.creator_id).eq('status','active').maybeSingle();
+        entitled=subscriptionAllowsVideo(video,subscription);
       }
       if(!entitled) return response(req,{error:'Premium access required'},403);
     }

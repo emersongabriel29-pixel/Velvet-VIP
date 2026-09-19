@@ -12,7 +12,7 @@ import {
   Server,
   UserCheck
 } from 'lucide-react';
-import { dbService } from '../../services/db';
+import { exportAccountData } from '../../services/accountData';
 import { useAuth } from '../../hooks/useAuth';
 
 interface LgpdTermsModalProps {
@@ -27,8 +27,10 @@ export const LgpdTermsModal: React.FC<LgpdTermsModalProps> = ({ isOpen, onClose 
 
   if (!isOpen) return null;
 
-  const handleExportData = () => {
-    const data = dbService.exportUserDataLGPD(currentUser.id);
+  const handleExportData = async () => {
+    let data: unknown;
+    try { data = await exportAccountData(); }
+    catch { window.alert('Não foi possível exportar seus dados. Faça login e tente novamente.'); return; }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

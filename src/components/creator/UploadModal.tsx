@@ -3,6 +3,8 @@ import { X, Upload, Film, CheckCircle2, Sparkles, Image, Lock, Globe, Users } fr
 import { dbService } from '../../services/db';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { uploadCreatorVideo } from '../../services/media';
+import { listCategories } from '../../services/accountData';
+import type { SystemCategory } from '../../types';
 
 interface UploadModalProps {
   mode?: 'short' | 'long';
@@ -39,8 +41,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
   const [thumbnailUrl, setThumbnailUrl] = useState(SAMPLE_PRESET_VIDEOS[0].thumb);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const systemCategories = dbService.getCategories();
-  const [category, setCategory] = useState(systemCategories[0]?.name || 'Glamour & Lifestyle');
+  const [systemCategories, setSystemCategories] = useState<SystemCategory[]>([]);
+  const [category, setCategory] = useState('');
+  React.useEffect(() => {
+    let active = true;
+    listCategories().then(rows => { if (active) { setSystemCategories(rows); setCategory(value => value || rows[0]?.name || ''); } }).catch(() => { if (active) setUploadError('Não foi possível carregar as categorias.'); });
+    return () => { active = false; };
+  }, []);
   const [hashtagsStr, setHashtagsStr] = useState('velvetvip, bastidores, exclusivo');
   const [accessType, setAccessType] = useState<'public' | 'followers' | 'premium'>('public');
   const [premiumPrice, setPremiumPrice] = useState(19.90);

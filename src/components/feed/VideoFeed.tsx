@@ -44,7 +44,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
       setVideos(dbService.getVideos(currentTab));
       return;
     }
-    let query = supabase.from('videos').select('*, creator:creators(*)').eq('is_draft', false).eq('is_removed', false).eq('moderation_status', 'approved').eq('media_status', 'ready');
+    let query = supabase.from('videos').select('*, creator:creators(*)').eq('is_draft', false).eq('is_removed', false).eq('moderation_status', 'approved').eq('media_status', 'ready').eq('processing_status', 'ready');
     if (currentTab === 'premium') query = query.eq('is_premium', true);
     if (currentTab === 'foryou') query = query.order('is_premium', { ascending: true }).order('created_at', { ascending: false });
     else query = query.order('created_at', { ascending: false });
@@ -86,7 +86,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
     const rank:Record<string,number>={free:0,basic:1,vip:2,exclusive:3};
     list=list.map((v:any)=>{
       const required=rank[v.required_tier||'vip']||0;
-      const unlocked=!v.is_premium||purchasedIds.has(v.id)||(subscriptionRank.get(v.creator_id)||0)>=required;
+      const unlocked=(!v.is_premium&&v.access_type==='free')||purchasedIds.has(v.id)||(v.access_type==='subscription'&&required>0&&(subscriptionRank.get(v.creator_id)||0)>=required);
       return {
         ...v,
         has_unlocked:unlocked,
@@ -107,13 +107,13 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
     if (containerRef.current) {
       containerRef.current.scrollTop = 0;
     }
-  }, [currentTab]);
+  }, [currentTab, currentUser.id]);
 
   useEffect(() => {
     if(isSupabaseConfigured) return;
     const unsub = dbService.subscribe(() => { void refreshFeed(); });
     return unsub;
-  }, [currentTab]);
+  }, [currentTab, currentUser.id]);
 
   // Handle scroll detection with IntersectionObserver
   useEffect(() => {

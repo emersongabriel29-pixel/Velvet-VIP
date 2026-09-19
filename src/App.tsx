@@ -10,7 +10,6 @@ import { NotificationsPage } from './components/activity/NotificationsPage';
 import { ProfileView } from './components/profile/ProfileView';
 import { CreatorDashboard } from './components/creator/CreatorDashboard';
 import { MyPurchasesPage } from './components/purchases/MyPurchasesPage';
-import { AdminPanel } from './components/admin/AdminPanel';
 import { AdminCommandCenter } from './components/admin/AdminCommandCenter';
 import { LandingPage } from './components/landing/LandingPage';
 import { UploadModal } from './components/creator/UploadModal';
