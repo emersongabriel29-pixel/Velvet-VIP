@@ -109,6 +109,18 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
         }:v.creator
       };
     });
+    // Creator progression influences discovery frequency without hiding newer content.
+    list.sort((a:any,b:any)=>{
+      const boostA=Number(a.creator?.feed_boost||1);
+      const boostB=Number(b.creator?.feed_boost||1);
+      const scoreA=Number(a.creator?.level_score||0);
+      const scoreB=Number(b.creator?.level_score||0);
+      const recencyA=new Date(a.created_at).getTime();
+      const recencyB=new Date(b.created_at).getTime();
+      const rankA=boostA*1000000+scoreA*100+recencyA/86400000;
+      const rankB=boostB*1000000+scoreB*100+recencyB/86400000;
+      return rankB-rankA;
+    });
     setVideos(list);
   };
 
