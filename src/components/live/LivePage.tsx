@@ -13,7 +13,7 @@ type Live = {
 type LiveSource={label:string;url:string;type:string};
 type PlayerState={live:Live;sources:LiveSource[];selected:LiveSource};
 
-export const LivePage:React.FC<{onBack:()=>void}>=({onBack})=>{
+export const LivePage:React.FC<{onBack:()=>void;initialLiveId?:string}>=({onBack,initialLiveId})=>{
   const {isAuthenticated}=useAuth();
   const [lives,setLives]=useState<Live[]>([]);
   const [reminded,setReminded]=useState<string[]>([]);
@@ -106,7 +106,7 @@ export const LivePage:React.FC<{onBack:()=>void}>=({onBack})=>{
                   <p className="mt-2 text-xs font-semibold text-amber-300">{live.required_plan==="free"?"Acesso aberto e gratuito":live.required_plan==="vip"?"Somente VIP":"Plus ou VIP"}</p>
                   {live.status==='live'?(
                     <div className="mt-4 space-y-2">
-                      <button onClick={()=>enterLive(live)} disabled={joining===live.id} className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 py-2.5 text-sm font-bold hover:bg-rose-500 disabled:opacity-50">{joining===live.id?<Loader2 className="h-4 w-4 animate-spin"/>:<Radio className="h-4 w-4"/>}Entrar na live</button>
+                      <button data-live-id={live.id} onClick={()=>enterLive(live)} disabled={joining===live.id} className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 py-2.5 text-sm font-bold hover:bg-rose-500 disabled:opacity-50">{joining===live.id?<Loader2 className="h-4 w-4 animate-spin"/>:<Radio className="h-4 w-4"/>}Entrar na live</button>
                       {live.tips_enabled&&<button onClick={()=>sendTip(live)} className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 py-2.5 text-sm font-bold text-amber-300">💰 Enviar gorjeta</button>}
                       {live.solo_enabled&&<button onClick={()=>buySolo(live)} className="flex w-full items-center justify-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 py-2.5 text-sm font-bold text-violet-300">🔒 Live Solo • R$ {Number(live.solo_price||0).toFixed(2).replace('.',',')}</button>}
                     </div>
