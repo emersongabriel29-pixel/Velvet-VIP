@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti';
 import { Creator, Video } from '../../types';
 import { dbService } from '../../services/db';
 import { useAuth } from '../../hooks/useAuth';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface SubscribeModalProps {
   creator: Creator;
@@ -28,6 +29,7 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card' | 'wallet'>('pix');
   const [processing, setProcessing] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [checkoutError,setCheckoutError]=useState('');
 
   if (!isOpen) return null;
 
@@ -72,37 +74,26 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
     },
   ];
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
+    setCheckoutError('');
+    if (!isSupabaseConfigured || !supabase) { setCheckoutError('Pagamento real indisponível: Supabase não configurado.'); return; }
+    if (paymentMethod === 'wallet') { setCheckoutError('Pagamento com saldo ainda não está habilitado para este checkout.'); return; }
     setProcessing(true);
-
-    setTimeout(() => {
-      if (activeTab === 'subscribe') {
-        dbService.subscribeToCreator(creator.id, selectedPlanTier);
-      } else if (video) {
-        dbService.purchaseVideo(video.id, paymentMethod);
+    try {
+      let type: 'subscription' | 'purchase';
+      let itemId: string;
+      if (activeTab === 'ppv' && video) { type='purchase'; itemId=video.id; }
+      else {
+        type='subscription';
+        const {data:plan,error}=await supabase.from('subscription_plans').select('id').eq('creator_id',creator.id).eq('tier',selectedPlanTier).limit(1).maybeSingle();
+        if(error || !plan) throw new Error('Plano selecionado não está cadastrado no Supabase.');
+        itemId=plan.id;
       }
-
-      setProcessing(false);
-      setCompleted(true);
-
-      // Trigger confetti celebration
-      try {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#e11d48', '#f59e0b', '#ec4899', '#ffffff'],
-        });
-      } catch (e) {
-        // ignore
-      }
-
-      setTimeout(() => {
-        setCompleted(false);
-        onClose();
-        if (onSuccess) onSuccess();
-      }, 2200);
-    }, 1200);
+      const {data,error}=await supabase.functions.invoke('create-payment-preference',{body:{type,item_id:itemId}});
+      if(error) throw error;
+      if(!data?.checkout_url) throw new Error(data?.error || 'Gateway não retornou o checkout.');
+      window.location.assign(data.checkout_url);
+    } catch(e:any) { setCheckoutError(e?.message || 'Não foi possível iniciar o pagamento.'); setProcessing(false); }
   };
 
   return (
@@ -259,6 +250,8 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
                 )
               )}
 
+              {checkoutError && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-950/30 p-3 text-xs text-rose-300">{checkoutError}</div>}
+
               {/* Payment Methods */}
               <div className="space-y-2">
                 <div className="text-xs font-semibold text-zinc-300">Método de Pagamento:</div>
@@ -306,7 +299,7 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
                 {paymentMethod === 'pix' && (
                   <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
                     <QrCode className="w-4 h-4 shrink-0" />
-                    <span>Aprovação e liberação imediata via chave copia-e-cola simulada.</span>
+                    <span>Você será direcionado ao checkout seguro do Mercado Pago. O acesso só é liberado após confirmação do pagamento.</span>
                   </div>
                 )}
 
