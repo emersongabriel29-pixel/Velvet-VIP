@@ -56,6 +56,21 @@ export interface LivePreview {
   creator?: Pick<Creator, 'id' | 'display_name' | 'handle' | 'avatar_url' | 'verified'>;
 }
 
+export interface AdCampaign {
+  id: string;
+  name: string;
+  advertiser_name: string;
+  creative_url?: string;
+  target_url?: string;
+  placement: 'feed' | 'explore' | 'banner';
+  status: 'draft' | 'active' | 'paused' | 'finished';
+  audience?: 'all' | 'free' | 'subscribers' | 'creators';
+  start_at?: string;
+  end_at?: string;
+  starts_at?: string;
+  ends_at?: string;
+}
+
 export interface Video {
   id: string;
   creator_id: string;

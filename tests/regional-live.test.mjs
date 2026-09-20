@@ -14,6 +14,9 @@ const profile=read('src/components/profile/ProfileView.tsx');
 const explore=read('src/components/explore/ExplorePage.tsx');
 const app=read('src/App.tsx');
 const accountData=read('src/services/accountData.ts');
+const feed=read('src/components/feed/VideoFeed.tsx');
+const adBanner=read('src/components/ads/AdBanner.tsx');
+const admin=read('src/components/admin/AdminCommandCenter.tsx');
 
 test('live engagement and paid offers are RLS protected',()=>{
   for(const table of ['live_likes','live_comments','live_shares','live_offers','live_offer_orders']){
@@ -63,4 +66,26 @@ test('featured lives open the selected session from explore and creator profiles
   assert.match(app,/onOpenLive=\{handleOpenLive\}/);
   assert.match(live,/data-live-card-id/);
   assert.match(live,/target\.status==='live'/);
+});
+
+test('production feed ranks each tab correctly and keeps free content first',()=>{
+  assert.match(feed,/currentTab==='trending'/);
+  assert.match(feed,/trendingScore\(b\)-trendingScore\(a\)/);
+  assert.match(feed,/Number\(a\.is_premium\)-Number\(b\.is_premium\)/);
+  assert.match(feed,/followedCreatorIds\.has\(v\.creator_id\)\?500:0/);
+  assert.match(feed,/subscriptionRank\.has\(v\.creator_id\)\?350:0/);
+  assert.match(feed,/purchasedCreatorIds\.has\(v\.creator_id\)\?150:0/);
+  assert.match(feed,/!v\.is_premium&&v\.access_type==='free'/);
+});
+
+test('feed renders active admin campaigns and recoverable loading errors',()=>{
+  assert.match(feed,/from\('ad_campaigns'\)/);
+  assert.match(feed,/settingsRow\.data\?\.ads_enabled!==false/);
+  assert.match(feed,/Não foi possível carregar o feed/);
+  assert.match(feed,/videos\.length === 0 && liveItems\.length === 0/);
+  assert.match(adBanner,/campaign\.advertiser_name/);
+  assert.match(adBanner,/noopener noreferrer sponsored/);
+  assert.doesNotMatch(adBanner,/Espaço reservado para anunciantes/);
+  assert.match(admin,/<option value="banner">Banner<\/option>/);
+  assert.doesNotMatch(admin,/<option value="stories">Stories<\/option>/);
 });
