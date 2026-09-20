@@ -1,16 +1,23 @@
 /// <reference types="vite/client" />
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = String((import.meta as any).env?.VITE_SUPABASE_URL || '').trim();
+// New Supabase projects should use a publishable key in browser clients. Keep
+// the legacy anon variable as a compatibility fallback for existing deploys.
+const supabasePublishableKey = String(
+  (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
+  '',
+).trim();
 const explicitDemoMode = String((import.meta as any).env?.VITE_DEMO_MODE || '').toLowerCase() === 'true';
 const productionBuild = Boolean((import.meta as any).env?.PROD);
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl && 
-  supabaseAnonKey && 
+  supabasePublishableKey &&
   !supabaseUrl.includes('your-project') && 
-  !supabaseAnonKey.includes('your-anon-key')
+  !supabasePublishableKey.includes('your-publishable-key') &&
+  !supabasePublishableKey.includes('your-anon-key')
 );
 
 export const isDemoMode = !isSupabaseConfigured && explicitDemoMode;
@@ -22,7 +29,7 @@ if (productionBuild && !isSupabaseConfigured && !explicitDemoMode) {
 }
 
 export const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey, {
+  ? createClient(supabaseUrl, supabasePublishableKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -36,7 +43,7 @@ export async function checkSupabaseConnection(): Promise<{ success: boolean; mes
   if (!isSupabaseConfigured || !supabase) {
     return {
       success: false,
-      message: 'Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env.',
+      message: 'Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY no ambiente.',
     };
   }
 

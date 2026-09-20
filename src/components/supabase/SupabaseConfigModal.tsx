@@ -95,7 +95,7 @@ export const SupabaseConfigModal: React.FC<SupabaseConfigModalProps> = ({ isOpen
             <div className="text-zinc-300 font-semibold mb-0.5">Status da Conexão:</div>
             <p className="text-zinc-500 text-[11px]">
               {isConfigured
-                ? 'Variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY detectadas.'
+                ? 'Variáveis VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY detectadas.'
                 : 'O backend não está configurado. Ative VITE_DEMO_MODE apenas para uma demonstração local explícita ou adicione as variáveis do Supabase.'}
             </p>
           </div>
