@@ -26,9 +26,9 @@ begin
  if exists(select 1 from public.profiles where id=b) then raise exception 'other_profile_visible'; end if;
  update public.profiles set role='admin',age_verified=true,wallet_balance=99999 where id=a;
  if exists(select 1 from public.profiles where id=a and (role<>'user' or age_verified or wallet_balance<>0)) then raise exception 'privileged_fields_writable'; end if;
- update public.notifications set read=true where user_id=a;
+ update public.notifications set read=true where user_id=a and title='QA';
  get diagnostics n=row_count;if n<>1 then raise exception 'own_notification_not_updated'; end if;
- update public.notifications set read=true where user_id=b;
+ update public.notifications set read=true where user_id=b and title='QA';
  get diagnostics n=row_count;if n<>0 then raise exception 'other_notification_updated'; end if;
  insert into public.safety_reports(reporter_id,target_type,target_id,reason) values(a,'video',current_setting('test.video')::uuid,'underage_suspicion');
  if not exists(select 1 from public.safety_reports where reporter_id=a and priority='urgent' and status='pending') then raise exception 'report_not_prioritized'; end if;

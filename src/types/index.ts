@@ -39,6 +39,11 @@ export interface Creator {
   category: string;
   identity_status?: 'pending' | 'verified' | 'rejected' | 'suspended';
   created_at: string;
+  level?: 1|2|3|4|5;
+  level_score?: number;
+  feed_boost?: number;
+  level_highlights_limit?: number;
+  level_updated_at?: string;
 }
 
 export interface Video {
@@ -69,6 +74,7 @@ export interface Video {
   moderation_status?: 'pending' | 'approved' | 'rejected' | 'removed';
   moderation_notes?: string;
   consent_confirmed?: boolean;
+  watermark_enabled?: boolean;
   created_at: string;
   // Dynamic runtime properties for current user
   creator?: Creator;
@@ -235,7 +241,7 @@ export interface Notification {
   sender_id?: string;
   sender_name?: string;
   sender_avatar?: string;
-  type: 'like' | 'comment' | 'follow' | 'subscription' | 'purchase' | 'premium_unlocked' | 'system' | 'payout';
+  type: 'like' | 'comment' | 'follow' | 'subscription' | 'purchase' | 'premium_unlocked' | 'system' | 'payout' | 'new_content' | 'new_creator';
   title: string;
   message: string;
   target_id?: string;

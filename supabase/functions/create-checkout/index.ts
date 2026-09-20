@@ -34,6 +34,11 @@ Deno.serve(async (req) => {
   let description = '';
   let referenceId: string | null = null;
   const metadata: Record<string, unknown> = { kind };
+  const requestedCurrency=String(body.currency||'BRL').toUpperCase();
+  // Mercado Pago Brazil settles this project in BRL. Persisting/charging a USD
+  // amount as BRL would be financially incorrect, so other currencies fail closed
+  // until a matching regional gateway is configured.
+  if(requestedCurrency!=='BRL') return json(req,{error:'Pagamentos em USD exigem um gateway regional configurado pelo administrador.',code:'unsupported_checkout_currency'},422);
 
   if (kind === 'platform_plan' && body.planId) {
     const { data: plan } = await admin.from('platform_plans').select('id,name,monthly_price,is_active').eq('id', body.planId).single();
@@ -66,20 +71,33 @@ Deno.serve(async (req) => {
     referenceId = video.id;
     metadata.creator_id = video.creator_id;
     metadata.video_id = video.id;
+  } else if (kind === 'live_solo' && body.creatorId && body.liveId) {
+    const { data: live } = await admin.from('live_sessions').select('id,creator_id,solo_enabled,solo_price,status,moderation_status').eq('id',body.liveId).eq('creator_id',body.creatorId).single();
+    if (!live?.solo_enabled || Number(live.solo_price) <= 0 || live.moderation_status !== 'approved') return json(req,{ error: 'Live Solo indisponível.' },400);
+    amount=Number(live.solo_price); description='Live Solo privada com criador Velvet VIP'; referenceId=live.id;
+    metadata.creator_id=live.creator_id; metadata.live_id=live.id;
   } else if (kind === 'tip' && body.creatorId) {
     amount = Number(body.amount);
-    if (!Number.isFinite(amount) || amount < 1 || amount > 9999) return json(req,{ error: 'Valor de gorjeta inválido.' }, 400);
+    const {data:regional}=await admin.from('app_content_settings').select('tips_enabled,tip_presets').eq('id','global').maybeSingle();
+    const presets=Array.isArray(regional?.tip_presets?.BRL)?regional.tip_presets.BRL.map(Number):[5,10,20,50,100];
+    if (!regional?.tips_enabled || !Number.isFinite(amount) || !presets.includes(amount)) return json(req,{ error: 'Valor de gorjeta inválido.' }, 400);
     description = 'Gorjeta para criador Velvet VIP';
     referenceId = body.creatorId;
     metadata.message = String(body.message || '').slice(0, 500);
     metadata.creator_id = body.creatorId;
+    if (body.liveId) metadata.live_id=body.liveId;
+  } else if(kind==='live_offer' && body.offerId){
+    const {data:offer}=await admin.from('live_offers').select('id,live_id,creator_id,title,amount,currency,status,max_orders,orders_count').eq('id',body.offerId).single();
+    if(!offer || offer.status!=='active' || offer.currency!=='BRL' || (offer.max_orders!==null && Number(offer.orders_count)>=Number(offer.max_orders))) return json(req,{error:'Pedido da live indisponível.'},409);
+    amount=Number(offer.amount);description=`Live: ${offer.title}`;referenceId=offer.id;
+    metadata.creator_id=offer.creator_id;metadata.live_id=offer.live_id;metadata.offer_id=offer.id;metadata.note=String(body.note||'').slice(0,500);
   } else {
     return json(req,{ error: 'Dados de checkout incompletos.' }, 400);
   }
 
   if (!Number.isFinite(amount) || amount <= 0) return json(req,{error:'Valor inválido.'},400);
   const { data: session, error: sessionError } = await admin.from('checkout_sessions').insert({
-    user_id: user.id, kind, reference_id: referenceId, amount, metadata
+    user_id: user.id, kind, reference_id: referenceId, amount, currency:'BRL', metadata
   }).select('id').single();
   if (sessionError || !session) return json(req,{ error: 'Não foi possível criar a sessão.' }, 500);
 

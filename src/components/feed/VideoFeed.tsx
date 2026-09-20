@@ -6,6 +6,7 @@ import { VideoCard } from './VideoCard';
 import { CommentsModal } from './CommentsModal';
 import { ShareModal } from './ShareModal';
 import { ReportModal } from './ReportModal';
+import { LiveFeedCard, FeedLive } from './LiveFeedCard';
 import { SubscribeModal } from '../creator/SubscribeModal';
 import { AdBanner } from '../ads/AdBanner';
 import { useAuth } from '../../hooks/useAuth';
@@ -29,6 +30,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
 }) => {
   const { currentUser } = useAuth();
   const [videos, setVideos] = useState<Video[]>([]);
+  const [liveItems, setLiveItems] = useState<FeedLive[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
 
@@ -49,6 +51,15 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
     if (!supabase) { setVideos([]); return; }
     let query = supabase.from('videos').select('*, creator:creators(*)').eq('is_draft', false).eq('is_removed', false).eq('moderation_status', 'approved').eq('media_status', 'ready').eq('processing_status', 'ready');
     if (selectedVideoId) query = query.eq('id',selectedVideoId);
+    const liveQuery = supabase.from('live_sessions')
+      .select('id,creator_id,title,required_plan,viewer_count,tips_enabled,creator:creators(display_name,avatar_url,level,level_score,feed_boost)')
+      .eq('status','live').eq('moderation_status','approved').order('viewer_count',{ascending:false}).limit(20);
+    const {data:liveData} = await liveQuery;
+    setLiveItems((liveData||[]).map((x:any)=>({
+      id:x.id,creator_id:x.creator_id,title:x.title,required_plan:x.required_plan,
+      viewer_count:x.viewer_count, tips_enabled:x.tips_enabled,
+       creator_name:x.creator?.display_name, creator_avatar:x.creator?.avatar_url
+     })));
     if (currentTab === 'premium') query = query.eq('is_premium', true);
     if (currentTab === 'foryou') query = query.order('is_premium', { ascending: true }).order('created_at', { ascending: false });
     else query = query.order('created_at', { ascending: false });
@@ -102,6 +113,18 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
         }:v.creator
       };
     });
+    // Creator progression influences discovery frequency without hiding newer content.
+    list.sort((a:any,b:any)=>{
+      const boostA=Number(a.creator?.feed_boost||1);
+      const boostB=Number(b.creator?.feed_boost||1);
+      const scoreA=Number(a.creator?.level_score||0);
+      const scoreB=Number(b.creator?.level_score||0);
+      const recencyA=new Date(a.created_at).getTime();
+      const recencyB=new Date(b.created_at).getTime();
+      const rankA=boostA*1000000+scoreA*100+recencyA/86400000;
+      const rankB=boostB*1000000+scoreB*100+recencyB/86400000;
+      return rankB-rankA;
+    });
     setVideos(list);
   };
 
@@ -137,7 +160,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
 
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
-  }, [activeIndex, videos.length]);
+  }, [activeIndex, liveItems.length, videos.length]);
 
   // Keyboard navigation: Arrow Up / Down to switch videos
   useEffect(() => {
@@ -159,10 +182,10 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeIndex, videos.length, selectedVideoForComments, selectedVideoForShare, selectedVideoForReport, selectedVideoForSubscribe]);
+  }, [activeIndex, liveItems.length, videos.length, selectedVideoForComments, selectedVideoForShare, selectedVideoForReport, selectedVideoForSubscribe]);
 
   const scrollToIndex = (index: number) => {
-    if (index < 0 || index >= videos.length) return;
+    if (index < 0 || index >= (liveItems.length + videos.length)) return;
     const container = containerRef.current;
     if (!container) return;
 
@@ -223,19 +246,24 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
             </button>
           </div>
         ) : (
-          videos.map((video, idx) => {
-            // Only mount full rendering for active video, preload adjacent 1 video
-            const isNear = Math.abs(idx - activeIndex) <= 1;
+          <>
+            {liveItems.map((live) => (
+              <div key={`live-${live.id}`} className="flex w-full min-h-full snap-start items-center justify-center p-3">
+                <LiveFeedCard live={live} isAuthenticated={Boolean(currentUser)} onOpen={() => window.dispatchEvent(new CustomEvent('velvet:open-live', { detail: live.id }))} />
+              </div>
+            ))}
+          {videos.map((video, idx) => {
+            const feedIndex = liveItems.length + idx;
+            const isNear = Math.abs(feedIndex - activeIndex) <= 1;
             const showAds = (currentUser.platform_plan_slug ?? 'gratis') === 'gratis' && idx > 0 && idx % 4 === 0;
-
-  return (
+            return (
     <div key={video.id} className="w-full min-h-full snap-start">
       {showAds && <AdBanner compact />}
       <div className="w-full h-full flex items-center justify-center">
                 {isNear ? (
                   <VideoCard
                     video={video}
-                    isActive={idx === activeIndex}
+                    isActive={feedIndex === activeIndex}
                     isMuted={isMuted}
                     onToggleMute={() => setIsMuted(!isMuted)}
                     onOpenComments={(v) => setSelectedVideoForComments(v)}
@@ -251,7 +279,8 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
               </div>
     </div>
             );
-          })
+          })}
+          </>
         )}
       </div>
 

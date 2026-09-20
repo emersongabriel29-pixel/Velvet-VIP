@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AlertTriangle, ArrowRight, CheckCircle2, Crown, Eye, EyeOff, Lock, Mail, ShieldCheck, Sparkles, User as UserIcon, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { isSupabaseConfigured } from '../../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 
 interface AuthModalProps { isOpen: boolean; onClose: () => void; onOpenTerms?: () => void; defaultMode?: 'login' | 'register'; }
 
@@ -51,6 +51,20 @@ export const AuthModalV2: React.FC<AuthModalProps> = ({ isOpen, onClose, onOpenT
       setSuccess('Se o e-mail estiver cadastrado, enviaremos um link seguro para redefinir a senha.');
     } finally { setLoading(false); }
   };
+  const loginWithGoogle = async () => {
+    setError(''); setSuccess(''); setLoading(true);
+    try {
+      if (!supabase) throw new Error('Supabase não configurado.');
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}${window.location.pathname}` },
+      });
+      if (oauthError) throw oauthError;
+    } catch (err:any) {
+      setError(err?.message || 'Não foi possível entrar com Google.');
+      setLoading(false);
+    }
+  };
   const quickLogin = (wanted: 'creator' | 'user' | 'admin') => { const u = allUsers.find(x => x.role === wanted); if (u) { switchUser(u.id); setSuccess(`Demonstração: ${u.name}`); setTimeout(onClose, 500); } };
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
@@ -62,6 +76,7 @@ export const AuthModalV2: React.FC<AuthModalProps> = ({ isOpen, onClose, onOpenT
       {error && <div className="mb-4 flex gap-2 rounded-xl border border-rose-500/40 bg-rose-950/50 p-3 text-xs text-rose-200"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
       {success && <div className="mb-4 flex gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/50 p-3 text-xs text-emerald-200"><CheckCircle2 className="h-4 w-4 shrink-0" />{success}</div>}
       {mode === 'login' ? <form onSubmit={submitLogin} className="space-y-4">
+        {isSupabaseConfigured&&<><button type="button" onClick={loginWithGoogle} disabled={loading} className="flex w-full items-center justify-center gap-3 rounded-xl border border-zinc-700 bg-white py-3 text-xs font-bold text-zinc-900 hover:bg-zinc-100 disabled:opacity-50"><span className="text-base font-black text-blue-600">G</span>Continuar com Google</button><div className="flex items-center gap-3 text-[10px] text-zinc-600"><span className="h-px flex-1 bg-zinc-800"/>ou use seu e-mail<span className="h-px flex-1 bg-zinc-800"/></div></>}
         <label className="block text-xs text-zinc-300">E-mail<input value={email} onChange={e => setEmail(e.target.value)} type="email" required autoComplete="email" className="mt-1.5 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-sm text-white outline-none focus:border-rose-500" /></label>
         <label className="block text-xs text-zinc-300">Senha<div className="relative mt-1.5"><Lock className="absolute left-3 top-3.5 h-4 w-4 text-zinc-500" /><input value={password} onChange={e => setPassword(e.target.value)} type={showPassword ? 'text' : 'password'} required autoComplete="current-password" className="w-full rounded-xl border border-zinc-700 bg-zinc-900 py-3 pl-10 pr-10 text-sm text-white outline-none focus:border-rose-500" /><button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-3 text-zinc-500">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div></label>
         <button type="button" onClick={forgotPassword} disabled={loading} className="w-full text-right text-[11px] text-zinc-400 hover:text-rose-300">Esqueci minha senha</button>

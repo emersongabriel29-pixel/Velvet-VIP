@@ -47,9 +47,13 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   const [pixKeyType, setPixKeyType] = useState('cpf');
   const [pixKey, setPixKey] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('500');
+  const [payoutCurrency,setPayoutCurrency]=useState<'BRL'|'USD'>(()=>navigator.language.toLowerCase().startsWith('en')?'USD':'BRL');
+  const [payoutCountry,setPayoutCountry]=useState<'BR'|'US'>(()=>navigator.language.toLowerCase().startsWith('en')?'US':'BR');
+  const [fxRates,setFxRates]=useState<Record<string,number>>({BRL:1,USD:5.3});
   const [payoutMessage, setPayoutMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Subscription plan prices state
+  const [pageCopy,setPageCopy]=useState({title:'Creator Studio',subtitle:'Publique, faça lives e monetize sua comunidade.'});
 
   const creator: Creator = currentCreator || {
     id: 'cr-default',
@@ -69,8 +73,10 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
     created_at: new Date().toISOString(),
   };
 
-  const creatorLevel = Math.max(1, Math.floor((creator.total_earnings || 0) / 1000) + 1);
-  const nextLevelTarget = creatorLevel * 1000;
+  const creatorLevel = creator.level || 1;
+  const creatorScore = Number(creator.level_score || 0);
+  const levelTargets:Record<number,number>={1:100,2:300,3:700,4:1400,5:1400};
+  const nextLevelTarget = levelTargets[creatorLevel] || 1400;
 
   const loadData = async () => {
     if (!creator.id) return;
@@ -105,6 +111,8 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   const deleteHighlight = async (id:string) => { if(!supabase||!confirm('Excluir este destaque?'))return;await supabase.from('creator_highlights').delete().eq('id',id);await loadHighlights(); };
 
   useEffect(() => {
+    if(isSupabaseConfigured && supabase){supabase.from('app_content_settings').select('creator_page_title,creator_page_subtitle').eq('id','global').maybeSingle().then(({data})=>{if(data)setPageCopy({title:data.creator_page_title||'Creator Studio',subtitle:data.creator_page_subtitle||'Publique, faça lives e monetize sua comunidade.'});});}
+    if(isSupabaseConfigured && supabase){supabase.from('app_content_settings').select('fx_rates').eq('id','global').maybeSingle().then(({data})=>{if(data?.fx_rates)setFxRates(data.fx_rates);});}
     void loadData();
     void loadHighlights();
   }, [currentCreator]);
@@ -122,13 +130,13 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
     e.preventDefault();
     const amt = parseFloat(withdrawAmount);
     if (isNaN(amt) || amt <= 0) { setPayoutMessage({ type: 'error', text: 'Informe um valor válido para saque.' }); return; }
-    if(!pixKey.trim()){setPayoutMessage({type:'error',text:'Informe sua chave PIX.'});return;}
+    if(!pixKey.trim()){setPayoutMessage({type:'error',text:'Informe o destino bancário do saque.'});return;}
     try {
       if(isDemoMode){
         dbService.requestWithdrawal(creator.id, amt, pixKey, pixKeyType);
       }else{
         if(!supabase) throw new Error('Supabase não configurado.');
-        const {error}=await supabase.rpc('request_creator_withdrawal',{p_amount:amt,p_pix_key:pixKey.trim(),p_pix_key_type:pixKeyType});
+        const {error}=await supabase.rpc('request_creator_withdrawal_regional',{p_amount_brl:amt,p_destination:pixKey.trim(),p_destination_type:pixKeyType,p_payout_currency:payoutCurrency,p_country:payoutCountry});
         if(error) throw error;
       }
       setPayoutMessage({ type: 'success', text: 'Solicitação de saque registrada para análise.' });
@@ -156,14 +164,15 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold mb-2">
             <Sparkles className="w-3.5 h-3.5 fill-amber-400" />
-            VELVET CREATOR STUDIO
+            {pageCopy.title}
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white font-display">
             Painel do Criador • {creator.display_name}
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">
-            Gerencie seus vídeos verticais, planos de assinatura VIP, faturamento e solicitações de saque.
-          </p>
+          <p className="text-xs sm:text-sm text-zinc-400 mt-0.5">{pageCopy.subtitle}</p>
+          <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[11px] font-bold text-amber-300">
+            ⭐ Nível {creatorLevel} • {creatorScore.toFixed(0)} pontos{creatorLevel<5?` • ${Math.max(0,nextLevelTarget-creatorScore).toFixed(0)} para o próximo`: ' • nível máximo'}
+          </div>
         </div>
 
         <button
@@ -441,7 +450,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
             <div>
               <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
                 <QrCode className="w-5 h-5 text-emerald-400" />
-                <span>Solicitar Saque via PIX</span>
+                <span>Solicitar saque regional</span>
               </h3>
               <p className="text-xs text-zinc-400 mt-0.5">
                 Transfira seus ganhos diretamente para sua conta bancária sem burocracia.
@@ -466,25 +475,26 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
             )}
 
             <form onSubmit={handleRequestPayout} className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block text-xs font-semibold text-zinc-300">País<select value={payoutCountry} onChange={e=>{const country=e.target.value as 'BR'|'US';setPayoutCountry(country);setPayoutCurrency(country==='US'?'USD':'BRL');setPixKeyType(country==='US'?'bank_account':'cpf')}} className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs"><option value="BR">Brasil</option><option value="US">Estados Unidos</option></select></label>
+                <label className="block text-xs font-semibold text-zinc-300">Moeda de recebimento<select value={payoutCurrency} onChange={e=>setPayoutCurrency(e.target.value as 'BRL'|'USD')} className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs"><option value="BRL">Real (BRL)</option><option value="USD">Dólar (USD)</option></select></label>
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Tipo de Chave PIX:
+                  Tipo de destino:
                 </label>
                 <select
                   value={pixKeyType}
                   onChange={(e) => setPixKeyType(e.target.value)}
                   className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-xs text-white focus:outline-none focus:border-rose-500"
                 >
-                  <option value="cpf">CPF / CNPJ</option>
-                  <option value="email">E-mail</option>
-                  <option value="phone">Telefone Celular</option>
-                  <option value="random">Chave Aleatória (EVP)</option>
+                  {payoutCountry==='BR'?<><option value="cpf">PIX • CPF / CNPJ</option><option value="email">PIX • E-mail</option><option value="phone">PIX • Telefone</option><option value="random">PIX • Chave aleatória</option></>:<><option value="bank_account">Conta bancária</option><option value="routing_account">Routing + account</option></>}
                 </select>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Sua Chave PIX:
+                  Destino bancário:
                 </label>
                 <input
                   type="text"
@@ -514,13 +524,14 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
                 <span className="text-[11px] text-zinc-500 mt-1 block">
                   Disponível para saque: <strong>R$ {(creator.available_balance ?? creator.wallet_balance ?? 0).toFixed(2).replace('.', ',')}</strong>
                 </span>
+                {payoutCurrency!=='BRL'&&<span className="mt-1 block text-[11px] text-amber-300">Cotação administrativa: aproximadamente {new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number(withdrawAmount||0)/Number(fxRates.USD||1))}. A cotação fica registrada no pedido.</span>}
               </div>
 
               <button
                 type="submit"
                 className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-emerald-950/40 cursor-pointer"
               >
-                Confirmar Saque PIX
+                Confirmar saque
               </button>
             </form>
           </div>
