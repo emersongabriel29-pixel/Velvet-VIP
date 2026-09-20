@@ -51,16 +51,16 @@ const products: Product[] = [
 ];
 
 const fairs = [
-  { name: "Feira do Produtor", place: "DF", status: "Aberta agora", vendors: 48, distance: "2,4 km" },
-  { name: "Feira Central", place: "DF", status: "Aberta agora", vendors: 31, distance: "4,8 km" },
-  { name: "Feira de Artesanato", place: "DF", status: "Abre às 18h", vendors: 22, distance: "6,1 km" },
+  { name: "Feira do Produtor", place: "DF", status: "Aberta agora", vendors: 48, distance: "2,4 km", lat: -15.836, lng: -47.934 },
+  { name: "Feira Central", place: "DF", status: "Aberta agora", vendors: 31, distance: "4,8 km", lat: -15.80, lng: -47.89 },
+  { name: "Feira de Artesanato", place: "DF", status: "Abre às 18h", vendors: 22, distance: "6,1 km", lat: -15.78, lng: -47.91 },
 ];
 
 export default function App() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Todos");
   const [cart, setCart] = useState<Record<number, number>>({});
-  const [showCart, setShowCart] = useState(false);
+  const [showCart, setShowCart] = useState(false);\n  const [location, setLocation] = useState("Informe sua localização");\n  const [locationStatus, setLocationStatus] = useState("");
   const [activeTab, setActiveTab] = useState("home");
 
   const filteredProducts = useMemo(() => {
@@ -103,7 +103,7 @@ export default function App() {
             <div className="hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 sm:block">A feira do seu jeito</div>
           </button>
 
-          <button className="hidden items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold md:flex">
+          <button onClick={useGPS} className="hidden items-center gap-2 rounded-xl bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 md:flex">
             <MapPin size={16} className="text-green-700" />
             Brasília, DF
           </button>
@@ -200,7 +200,7 @@ export default function App() {
                       </div>
                       <div className="mt-4 flex items-center justify-between text-xs font-semibold text-slate-500">
                         <span>{fair.vendors} feirantes</span>
-                        <button className="text-green-700">Explorar →</button>
+                        <button onClick={() => openMap(fair.lat, fair.lng)} className="text-green-700">Como chegar →</button>
                       </div>
                     </div>
                   </article>
