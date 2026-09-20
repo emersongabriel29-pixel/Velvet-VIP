@@ -176,9 +176,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   const shareProfile = async () => {
+    const name = creator?.display_name || currentUser.name;
     const url=`${window.location.origin}${window.location.pathname}#creator=${creator?.id || currentUser.id}`;
-    const data={title:creator?.display_name || currentUser.name,text:`Veja o perfil de ${creator?.display_name || currentUser.name} no Velvet VIP`,url};
-    try { if(navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(url); alert('Link do perfil copiado.'); } } catch {}
+    const text = creator
+      ? `🔥 Conheça ${name} no Velvet VIP! Assista aos vídeos gratuitos e confira conteúdos exclusivos, lives e destaques. 🔞`
+      : `Veja o perfil de ${name} no Velvet VIP. 🔞`;
+    const data={title:`${name} no Velvet VIP`,text,url};
+    try {
+      if(navigator.share) await navigator.share(data);
+      else {
+        await navigator.clipboard.writeText(`${text}\n${url}`);
+        alert('Texto e link do perfil copiados.');
+      }
+    } catch {}
   };
 
   // Filter videos according to tab. On shared creator profiles, free previews
