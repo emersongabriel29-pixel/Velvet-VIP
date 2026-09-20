@@ -1,342 +1,53 @@
 import { useMemo, useState } from "react";
-import {
-  ArrowRight,
-  Bike,
-  ChevronRight,
-  CircleUserRound,
-  Clock3,
-  Heart,
-  MapPin,
-  Minus,
-  Package,
-  Plus,
-  Search,
-  ShoppingBag,
-  Store,
-  Trash2,
-  X,
-} from "lucide-react";
+import { MapPin, Search, ShoppingBag, Plus, Minus, Trash2, X, Heart, Package, User, Store, Bike, ShieldCheck, LayoutDashboard, ChevronRight } from "lucide-react";
 
-type Category = { name: string; emoji: string };
-type Product = {
-  id: number;
-  name: string;
-  vendor: string;
-  fair: string;
-  price: number;
-  category: string;
-  emoji: string;
-};
-
-const categories: Category[] = [
-  { name: "Hortifruti", emoji: "🥬" },
-  { name: "Carnes", emoji: "🥩" },
-  { name: "Queijos", emoji: "🧀" },
-  { name: "Doces", emoji: "🍰" },
-  { name: "Comidas", emoji: "🍲" },
-  { name: "Moda", emoji: "👕" },
-  { name: "Artesanato", emoji: "🧶" },
-  { name: "Casa", emoji: "🏠" },
-  { name: "Plantas", emoji: "🪴" },
-  { name: "Presentes", emoji: "🎁" },
+type Role="customer"|"vendor"|"delivery"|"admin";
+type Product={id:number;name:string;vendor:string;fair:string;price:number;category:string;emoji:string;stock:number};
+const categories=["Hortifruti","Carnes","Queijos","Padaria","Doces","Comidas prontas","Moda","Artesanato","Casa","Plantas","Presentes"];
+const products:Product[]=[
+{id:1,name:"Cesta de frutas",vendor:"Sítio da Vó",fair:"Feira do Produtor",price:24.9,category:"Hortifruti",emoji:"🍎",stock:30},
+{id:2,name:"Queijo artesanal",vendor:"Queijaria do Cerrado",fair:"Feira do Produtor",price:32,category:"Queijos",emoji:"🧀",stock:18},
+{id:3,name:"Bolo de milho",vendor:"Delícias da Feira",fair:"Feira Central",price:18,category:"Doces",emoji:"🌽",stock:12},
+{id:4,name:"Cesta de pães",vendor:"Forno da Praça",fair:"Feira Central",price:21.5,category:"Padaria",emoji:"🥖",stock:25},
+{id:5,name:"Planta ornamental",vendor:"Verde Cerrado",fair:"Feira de Artesanato",price:28,category:"Plantas",emoji:"🪴",stock:9},
+{id:6,name:"Bolsa artesanal",vendor:"Mãos do DF",fair:"Feira de Artesanato",price:69.9,category:"Artesanato",emoji:"👜",stock:7},
+{id:7,name:"Mel artesanal",vendor:"Apiário Cerrado",fair:"Feira Central",price:28,category:"Doces",emoji:"🍯",stock:15},
+{id:8,name:"Pastel de carne",vendor:"Pastelaria da Feira",fair:"Feira do Produtor",price:9.5,category:"Comidas prontas",emoji:"🥟",stock:40}
 ];
-
-const products: Product[] = [
-  { id: 1, name: "Cesta de frutas", vendor: "Sítio da Vó", fair: "Feira do Produtor", price: 24.9, category: "Hortifruti", emoji: "🍎" },
-  { id: 2, name: "Queijo artesanal", vendor: "Queijaria do Cerrado", fair: "Feira do Produtor", price: 32, category: "Queijos", emoji: "🧀" },
-  { id: 3, name: "Bolo de milho", vendor: "Delícias da Feira", fair: "Feira Central", price: 18, category: "Doces", emoji: "🌽" },
-  { id: 4, name: "Cesta de pães", vendor: "Forno da Praça", fair: "Feira Central", price: 21.5, category: "Comidas", emoji: "🥖" },
-  { id: 5, name: "Planta ornamental", vendor: "Verde Cerrado", fair: "Feira de Artesanato", price: 28, category: "Plantas", emoji: "🪴" },
-  { id: 6, name: "Bolsa artesanal", vendor: "Mãos do DF", fair: "Feira de Artesanato", price: 69.9, category: "Artesanato", emoji: "👜" },
+const fairs=[
+{name:"Feira do Produtor",place:"Planaltina",status:"Aberta agora",vendors:48,distance:"1,8 km",lat:-15.836,lng:-47.934},
+{name:"Feira Central",place:"Brasília",status:"Aberta agora",vendors:31,distance:"28,4 km",lat:-15.80,lng:-47.89},
+{name:"Feira de Artesanato",place:"Brasília",status:"Abre às 18h",vendors:22,distance:"30,1 km",lat:-15.78,lng:-47.91}
 ];
-
-const fairs = [
-  { name: "Feira do Produtor", place: "DF", status: "Aberta agora", vendors: 48, distance: "2,4 km", lat: -15.836, lng: -47.934 },
-  { name: "Feira Central", place: "DF", status: "Aberta agora", vendors: 31, distance: "4,8 km", lat: -15.80, lng: -47.89 },
-  { name: "Feira de Artesanato", place: "DF", status: "Abre às 18h", vendors: 22, distance: "6,1 km", lat: -15.78, lng: -47.91 },
-];
-
-export default function App() {
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("Todos");
-  const [cart, setCart] = useState<Record<number, number>>({});
-  const [showCart, setShowCart] = useState(false);\n  const [location, setLocation] = useState("Informe sua localização");\n  const [locationStatus, setLocationStatus] = useState("");
-  const [activeTab, setActiveTab] = useState("home");
-
-  const filteredProducts = useMemo(() => {
-    const normalized = query.toLowerCase().trim();
-    return products.filter((product) => {
-      const matchesCategory = category === "Todos" || product.category === category;
-      const matchesQuery =
-        !normalized ||
-        product.name.toLowerCase().includes(normalized) ||
-        product.vendor.toLowerCase().includes(normalized) ||
-        product.fair.toLowerCase().includes(normalized);
-      return matchesCategory && matchesQuery;
-    });
-  }, [query, category]);
-
-  const cartItems = products.filter((product) => cart[product.id]);
-  const cartCount = Object.values(cart).reduce((sum, quantity) => sum + quantity, 0);
-  const cartTotal = cartItems.reduce((sum, product) => sum + product.price * cart[product.id], 0);
-
-  function addToCart(productId: number) {
-    setCart((current) => ({ ...current, [productId]: (current[productId] ?? 0) + 1 }));
-  }
-
-  function removeFromCart(productId: number) {
-    setCart((current) => {
-      const next = { ...current };
-      if (!next[productId]) return next;
-      if (next[productId] === 1) delete next[productId];
-      else next[productId] -= 1;
-      return next;
-    });
-  }
-
-  return (
-    <div className="min-h-screen bg-[#f7f8f3] text-slate-900">
-      <header className="sticky top-0 z-30 border-b border-black/5 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
-          <button onClick={() => setActiveTab("home")} className="shrink-0 text-left">
-            <div className="text-2xl font-black tracking-tight text-green-700">Feiraê<span className="text-amber-500">.</span></div>
-            <div className="hidden text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 sm:block">A feira do seu jeito</div>
-          </button>
-
-          <button onClick={useGPS} className="hidden items-center gap-2 rounded-xl bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 md:flex">
-            <MapPin size={16} className="text-green-700" />
-            Brasília, DF
-          </button>
-
-          <div className="relative flex-1">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="O que você procura na feira?"
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-green-500 focus:bg-white"
-            />
-          </div>
-
-          <button className="hidden rounded-full p-2 text-slate-600 hover:bg-slate-100 sm:block">
-            <CircleUserRound />
-          </button>
-
-          <button
-            onClick={() => setShowCart(true)}
-            className="relative rounded-2xl bg-green-700 p-3 text-white shadow-sm transition hover:bg-green-800"
-          >
-            <ShoppingBag size={20} />
-            {cartCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[11px] font-black text-slate-900">
-                {cartCount}
-              </span>
-            )}
-          </button>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-7xl px-4 pb-28 pt-6 sm:px-6">
-        {activeTab === "home" && (
-          <>
-            <section className="relative overflow-hidden rounded-[2rem] bg-green-800 p-7 text-white shadow-lg sm:p-10">
-              <div className="relative z-10 max-w-2xl">
-                <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-wider">Marketplace das feiras do DF</span>
-                <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">Tudo que você encontra na feira, no seu celular.</h1>
-                <p className="mt-4 max-w-xl text-sm leading-6 text-green-50 sm:text-base">
-                  Descubra feirantes, produtos e feiras perto de você. Compre para receber em casa ou retirar.
-                </p>
-                <button
-                  onClick={() => document.getElementById("produtos")?.scrollIntoView({ behavior: "smooth" })}
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-amber-400 px-5 py-3 text-sm font-black text-slate-950"
-                >
-                  Explorar produtos <ArrowRight size={17} />
-                </button>
-              </div>
-              <div className="absolute -right-10 -top-16 text-[11rem] opacity-20">🧺</div>
-              <div className="absolute -bottom-10 right-28 text-7xl opacity-20">🥬</div>
-            </section>
-
-            <section className="mt-8">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-xl font-black">Categorias</h2>
-                <button onClick={() => setCategory("Todos")} className="text-sm font-bold text-green-700">Ver todas</button>
-              </div>
-              <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
-                {categories.map((item) => (
-                  <button
-                    key={item.name}
-                    onClick={() => setCategory(item.name)}
-                    className={`rounded-2xl border p-3 text-center transition ${category === item.name ? "border-green-600 bg-green-50" : "border-slate-200 bg-white hover:border-green-300"}`}
-                  >
-                    <div className="text-2xl">{item.emoji}</div>
-                    <div className="mt-1 truncate text-[11px] font-bold">{item.name}</div>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="mt-10">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-black">Feiras em destaque</h2>
-                  <p className="text-sm text-slate-500">Onde comprar hoje</p>
-                </div>
-                <button className="flex items-center gap-1 text-sm font-bold text-green-700">Ver todas <ChevronRight size={16} /></button>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                {fairs.map((fair) => (
-                  <article key={fair.name} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <div className="flex h-32 items-end bg-gradient-to-br from-green-100 via-lime-50 to-amber-50 p-4">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-3xl shadow-sm">🧺</div>
-                    </div>
-                    <div className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <h3 className="font-black">{fair.name}</h3>
-                          <p className="mt-1 flex items-center gap-1 text-xs text-slate-500"><MapPin size={13} /> {fair.place} · {fair.distance}</p>
-                        </div>
-                        <span className={`rounded-full px-2 py-1 text-[10px] font-black ${fair.status.startsWith("Aberta") ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{fair.status}</span>
-                      </div>
-                      <div className="mt-4 flex items-center justify-between text-xs font-semibold text-slate-500">
-                        <span>{fair.vendors} feirantes</span>
-                        <button onClick={() => openMap(fair.lat, fair.lng)} className="text-green-700">Como chegar →</button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section id="produtos" className="mt-10">
-              <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-black">Produtos perto de você</h2>
-                  <p className="text-sm text-slate-500">{category === "Todos" ? "Uma amostra do que a feira tem para oferecer" : `Categoria: ${category}`}</p>
-                </div>
-                {category !== "Todos" && (
-                  <button onClick={() => setCategory("Todos")} className="text-sm font-bold text-green-700">Limpar filtro</button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                {filteredProducts.map((product) => (
-                  <article key={product.id} className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <div className="relative flex aspect-square items-center justify-center bg-gradient-to-br from-lime-50 to-amber-50 text-6xl">
-                      {product.emoji}
-                      <button className="absolute right-2 top-2 rounded-full bg-white/90 p-2 text-slate-500 shadow-sm"><Heart size={15} /></button>
-                    </div>
-                    <div className="p-3">
-                      <p className="truncate text-[11px] font-bold text-green-700">{product.vendor}</p>
-                      <h3 className="mt-1 line-clamp-2 min-h-10 text-sm font-black">{product.name}</h3>
-                      <p className="mt-1 text-[11px] text-slate-400">{product.fair}</p>
-                      <div className="mt-3 flex items-center justify-between gap-2">
-                        <strong className="text-base">R$ {product.price.toFixed(2).replace(".", ",")}</strong>
-                        <button onClick={() => addToCart(product.id)} className="rounded-xl bg-green-700 p-2 text-white hover:bg-green-800" aria-label={`Adicionar ${product.name}`}>
-                          <Plus size={17} />
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-
-              {filteredProducts.length === 0 && (
-                <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center">
-                  <div className="text-4xl">🔎</div>
-                  <h3 className="mt-3 font-black">Nenhum produto encontrado</h3>
-                  <p className="mt-1 text-sm text-slate-500">Tente outro termo ou categoria.</p>
-                </div>
-              )}
-            </section>
-          </>
-        )}
-
-        {activeTab === "orders" && (
-          <section className="mx-auto max-w-2xl py-16 text-center">
-            <Package className="mx-auto text-green-700" size={42} />
-            <h1 className="mt-4 text-2xl font-black">Meus pedidos</h1>
-            <p className="mt-2 text-sm text-slate-500">Seus pedidos e o acompanhamento da entrega aparecerão aqui.</p>
-          </section>
-        )}
-
-        {activeTab === "profile" && (
-          <section className="mx-auto max-w-2xl py-16 text-center">
-            <CircleUserRound className="mx-auto text-green-700" size={42} />
-            <h1 className="mt-4 text-2xl font-black">Meu perfil</h1>
-            <p className="mt-2 text-sm text-slate-500">Endereços, favoritos, pagamentos e preferências.</p>
-          </section>
-        )}
-      </main>
-
-      <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white/95 px-4 py-2 backdrop-blur md:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-3 gap-2">
-          <button onClick={() => setActiveTab("home")} className={`rounded-xl py-2 text-xs font-bold ${activeTab === "home" ? "bg-green-50 text-green-700" : "text-slate-500"}`}>Início</button>
-          <button onClick={() => setActiveTab("orders")} className={`rounded-xl py-2 text-xs font-bold ${activeTab === "orders" ? "bg-green-50 text-green-700" : "text-slate-500"}`}>Pedidos</button>
-          <button onClick={() => setActiveTab("profile")} className={`rounded-xl py-2 text-xs font-bold ${activeTab === "profile" ? "bg-green-50 text-green-700" : "text-slate-500"}`}>Perfil</button>
-        </div>
-      </nav>
-
-      {showCart && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40">
-          <aside className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b p-5">
-              <div>
-                <h2 className="text-xl font-black">Minha Feira</h2>
-                <p className="text-xs text-slate-500">{cartCount} item(ns)</p>
-              </div>
-              <button onClick={() => setShowCart(false)} className="rounded-full bg-slate-100 p-2"><X size={18} /></button>
-            </div>
-
-            <div className="flex-1 overflow-auto p-5">
-              {cartItems.length === 0 ? (
-                <div className="py-20 text-center">
-                  <ShoppingBag className="mx-auto text-slate-300" size={48} />
-                  <h3 className="mt-4 font-black">Sua sacola está vazia</h3>
-                  <p className="mt-1 text-sm text-slate-500">Adicione produtos das feiras para começar.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {cartItems.map((product) => (
-                    <div key={product.id} className="rounded-2xl border border-slate-200 p-3">
-                      <div className="flex gap-3">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-lime-50 text-2xl">{product.emoji}</div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex justify-between gap-2">
-                            <div>
-                              <p className="text-sm font-black">{product.name}</p>
-                              <p className="text-[11px] text-slate-500">{product.vendor}</p>
-                            </div>
-                            <button onClick={() => removeFromCart(product.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={15} /></button>
-                          </div>
-                          <div className="mt-2 flex items-center justify-between">
-                            <strong>R$ {(product.price * cart[product.id]).toFixed(2).replace(".", ",")}</strong>
-                            <div className="flex items-center gap-2 rounded-xl bg-slate-100 p-1">
-                              <button onClick={() => removeFromCart(product.id)} className="rounded-lg p-1 hover:bg-white"><Minus size={14} /></button>
-                              <span className="w-5 text-center text-xs font-black">{cart[product.id]}</span>
-                              <button onClick={() => addToCart(product.id)} className="rounded-lg p-1 hover:bg-white"><Plus size={14} /></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {cartItems.length > 0 && (
-              <div className="border-t p-5">
-                <div className="mb-2 flex justify-between text-sm"><span className="text-slate-500">Produtos</span><strong>R$ {cartTotal.toFixed(2).replace(".", ",")}</strong></div>
-                <div className="mb-4 flex justify-between text-sm"><span className="text-slate-500">Entrega</span><span className="font-bold text-green-700">A calcular</span></div>
-                <button className="w-full rounded-2xl bg-green-700 py-4 font-black text-white hover:bg-green-800">
-                  Continuar para checkout
-                </button>
-              </div>
-            )}
-          </aside>
-        </div>
-      )}
-    </div>
-  );
+const money=(n:number)=>n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+export default function App(){
+ const [role,setRole]=useState<Role>("customer"),[tab,setTab]=useState("home"),[query,setQuery]=useState(""),[category,setCategory]=useState("Todos"),[cart,setCart]=useState<Record<number,number>>({}),[cartOpen,setCartOpen]=useState(false),[location,setLocation]=useState("Planaltina, DF");
+ const filtered=useMemo(()=>products.filter(p=>(category==="Todos"||p.category===category)&&(!query||[p.name,p.vendor,p.fair,p.category].join(" ").toLowerCase().includes(query.toLowerCase()))),[query,category]);
+ const items=products.filter(p=>cart[p.id]); const count=Object.values(cart).reduce((a,b)=>a+b,0); const total=items.reduce((s,p)=>s+p.price*cart[p.id],0);
+ const add=(id:number)=>setCart(c=>({...c,[id]:(c[id]||0)+1})); const remove=(id:number)=>setCart(c=>{const n={...c};if(!n[id])return n;if(n[id]===1)delete n[id];else n[id]--;return n});
+ const gps=()=>{if(!navigator.geolocation){setLocation("Informe sua localização");return} navigator.geolocation.getCurrentPosition(()=>setLocation("Minha localização"),()=>setLocation("Localização manual"))};
+ const map=(lat:number,lng:number)=>window.open("https://www.google.com/maps/dir/?api=1&destination="+lat+","+lng,"_blank");
+ const customer=role==="customer";
+ return <div className="min-h-screen bg-[#f7f8f3] text-slate-900 pb-20">
+  <header className="sticky top-0 z-40 border-b border-black/5 bg-white/95 backdrop-blur"><div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
+   <button onClick={()=>{setRole("customer");setTab("home")}} className="mr-1 text-left"><b className="text-2xl font-black text-green-700">Feiraê<span className="text-amber-500">.</span></b><small className="hidden sm:block text-[10px] font-bold uppercase tracking-widest text-slate-400">A feira do seu jeito</small></button>
+   <button onClick={gps} className="hidden rounded-xl bg-green-50 px-3 py-2 text-xs font-bold text-green-800 md:flex items-center gap-1"><MapPin size={15}/>{location}</button>
+   <div className="relative flex-1 min-w-[180px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="O que você procura na feira?" className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-3 outline-none focus:border-green-500"/></div>
+   <button onClick={()=>setCartOpen(true)} className="relative rounded-2xl bg-green-700 p-3 text-white"><ShoppingBag size={20}/>{count>0&&<span className="absolute -right-1 -top-1 rounded-full bg-amber-400 px-1.5 text-xs font-black text-slate-900">{count}</span>}</button>
+  </div></header>
+  {customer?<main className="mx-auto max-w-7xl px-4 py-6">
+   {tab==="home"&&<><section className="relative overflow-hidden rounded-[2rem] bg-green-800 p-8 text-white sm:p-12"><div className="max-w-2xl"><span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold">MARKETPLACE DAS FEIRAS DO DF</span><h1 className="mt-4 text-4xl font-black sm:text-5xl">Tudo que você encontra na feira, no seu celular.</h1><p className="mt-4 text-green-50">Descubra feirantes, produtos e feiras perto de você. Compre para receber em casa ou retirar.</p><button onClick={()=>document.getElementById("catalogo")?.scrollIntoView({behavior:"smooth"})} className="mt-6 rounded-xl bg-amber-400 px-5 py-3 font-black text-slate-950">Explorar produtos →</button></div><div className="absolute -right-5 -top-10 text-[10rem] opacity-20">🧺</div></section>
+   <section className="mt-8"><div className="mb-4 flex justify-between"><h2 className="text-xl font-black">Categorias</h2><button onClick={()=>setCategory("Todos")} className="text-sm font-bold text-green-700">Todas</button></div><div className="flex gap-2 overflow-auto pb-2">{categories.map(c=><button onClick={()=>setCategory(c)} className={`whitespace-nowrap rounded-2xl border px-4 py-3 text-xs font-bold ${category===c?"border-green-600 bg-green-50":"border-slate-200 bg-white"}`}>{c}</button>)}</div></section>
+   <section className="mt-10"><div className="mb-4"><h2 className="text-xl font-black">Feiras em destaque</h2><p className="text-sm text-slate-500">Encontre uma feira perto de você</p></div><div className="grid gap-4 md:grid-cols-3">{fairs.map(f=><article className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm"><div className="flex h-28 items-end bg-gradient-to-br from-green-100 to-amber-50 p-4 text-4xl">🧺</div><div className="p-4"><div className="flex justify-between gap-2"><h3 className="font-black">{f.name}</h3><span className="text-[10px] font-black text-green-700">{f.status}</span></div><p className="mt-2 text-xs text-slate-500"><MapPin size={12} className="inline"/> {f.place} · {f.distance} · {f.vendors} feirantes</p><button onClick={()=>map(f.lat,f.lng)} className="mt-4 text-xs font-bold text-green-700">Como chegar →</button></div></article>)}</div></section></>}
+   {tab==="fairs"&&<><h1 className="text-3xl font-black">Feiras</h1><p className="text-slate-500">Escolha onde quer comprar.</p><div className="mt-6 grid gap-4 md:grid-cols-3">{fairs.map(f=><article className="rounded-3xl border bg-white p-5"><div className="text-5xl">🧺</div><h2 className="mt-4 font-black">{f.name}</h2><p className="text-sm text-slate-500">{f.place} · {f.distance}</p><button onClick={()=>setTab("products")} className="mt-5 w-full rounded-xl bg-green-700 py-3 font-bold text-white">Entrar na feira</button><button onClick={()=>map(f.lat,f.lng)} className="mt-2 w-full rounded-xl bg-slate-100 py-3 font-bold">Como chegar</button></article>)}</div></>}
+   {tab==="products"&&<><h1 className="text-3xl font-black">Catálogo</h1><div className="mt-4 flex gap-2 overflow-auto pb-2">{["Todos",...categories].map(c=><button onClick={()=>setCategory(c)} className={`whitespace-nowrap rounded-xl px-3 py-2 text-xs font-bold ${category===c?"bg-green-700 text-white":"bg-white border"}`}>{c}</button>)}</div><div id="catalogo" className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{filtered.map(p=><ProductCard p={p} add={add}/>)}</div></>}
+   {tab==="orders"&&<section className="mx-auto max-w-2xl py-14"><Package className="text-green-700" size={42}/><h1 className="mt-4 text-3xl font-black">Meus pedidos</h1><div className="mt-5 rounded-3xl border bg-white p-5"><b>FE-1024</b><p className="text-sm text-slate-500">20/09/2026 · 3 itens</p><strong className="text-green-700">Em preparação</strong><p className="mt-3">{money(58.7)}</p><button className="mt-3 rounded-xl bg-green-700 px-4 py-2 text-sm font-bold text-white">Acompanhar pedido</button></div></section>}
+   {tab==="profile"&&<section className="mx-auto max-w-2xl py-14"><User className="text-green-700" size={42}/><h1 className="mt-4 text-3xl font-black">Meu perfil</h1><div className="mt-5 grid gap-2">{["Meus endereços","Favoritos","Pagamentos","Notificações","Configurações"].map(x=><button className="flex justify-between rounded-2xl border bg-white p-4 text-left font-bold">{x}<ChevronRight/></button>)}</div></section>}
+  </main>:<Dashboard role={role}/>}
+  {customer&&<nav className="fixed bottom-0 left-0 right-0 z-30 border-t bg-white/95 p-2 md:hidden"><div className="mx-auto grid max-w-md grid-cols-4 gap-1"><button onClick={()=>setTab("home")} className="rounded-xl p-2 text-xs font-bold">⌂<br/>Início</button><button onClick={()=>setTab("fairs")} className="rounded-xl p-2 text-xs font-bold">🧺<br/>Feiras</button><button onClick={()=>setTab("orders")} className="rounded-xl p-2 text-xs font-bold">📦<br/>Pedidos</button><button onClick={()=>setTab("profile")} className="rounded-xl p-2 text-xs font-bold">👤<br/>Perfil</button></div></nav>}
+  <div className="fixed bottom-20 right-3 z-30 hidden rounded-2xl border bg-white p-2 shadow-lg md:flex gap-1"><button onClick={()=>setRole("customer")} className="text-xs">Cliente</button><button onClick={()=>setRole("vendor")} className="text-xs">Feirante</button><button onClick={()=>setRole("delivery")} className="text-xs">Entregador</button><button onClick={()=>setRole("admin")} className="text-xs">Admin</button></div>
+  {cartOpen&&<div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40"><aside className="flex h-full w-full max-w-md flex-col bg-white"><div className="flex justify-between border-b p-5"><div><h2 className="text-xl font-black">Minha Feira</h2><small>{count} item(ns)</small></div><button onClick={()=>setCartOpen(false)}><X/></button></div><div className="flex-1 overflow-auto p-5">{items.length?items.map(p=><div className="mb-3 rounded-2xl border p-3"><div className="flex gap-3"><span className="text-3xl">{p.emoji}</span><div className="flex-1"><b>{p.name}</b><small className="block text-slate-500">{p.vendor}</small><div className="mt-2 flex justify-between"><strong>{money(p.price*cart[p.id])}</strong><span><button onClick={()=>remove(p.id)}><Minus size={15}/></button> {cart[p.id]} <button onClick={()=>add(p.id)}><Plus size={15}/></button></span></div></div><button onClick={()=>setCart(c=>{const n={...c};delete n[p.id];return n})}><Trash2 size={15}/></button></div></div>):<div className="py-20 text-center"><ShoppingBag className="mx-auto text-slate-300" size={45}/><p className="font-bold">Sua sacola está vazia.</p></div>}</div>{items.length>0&&<div className="border-t p-5"><div className="flex justify-between"><span>Subtotal</span><b>{money(total)}</b></div><p className="text-xs text-slate-500">Entrega será calculada no checkout.</p><button className="mt-4 w-full rounded-2xl bg-green-700 py-4 font-black text-white" onClick={()=>alert("Checkout demonstrativo. A integração real será feita na última fase.")}>Continuar para checkout</button></div>}</aside></div>}
+ </div>
 }
+function ProductCard({p,add}:{p:Product;add:(id:number)=>void}){return <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"><div className="flex aspect-square items-center justify-center bg-gradient-to-br from-lime-50 to-amber-50 text-6xl">{p.emoji}</div><div className="p-3"><small className="font-bold text-green-700">{p.vendor}</small><h3 className="mt-1 font-black">{p.name}</h3><p className="text-[11px] text-slate-400">{p.fair} · {p.stock} disponíveis</p><div className="mt-3 flex items-center justify-between"><b>{money(p.price)}</b><button onClick={()=>add(p.id)} className="rounded-xl bg-green-700 p-2 text-white"><Plus size={17}/></button></div></div></article>}
+function Dashboard({role}:{role:Role}){const data=role==="vendor"?{icon:<Store/>,title:"Painel do feirante",items:["Dashboard","Pedidos","Produtos","Estoque","Minha loja","Minha feira","Vendas","Financeiro","Avaliações","Configurações"]}:role==="delivery"?{icon:<Bike/>,title:"Central de entregas",items:["Dashboard","Entregas disponíveis","Minhas entregas","Mapa e rotas","Ganhos","Histórico","Disponibilidade"]}:{icon:<ShieldCheck/>,title:"Painel administrativo",items:["Dashboard","Usuários","Feiras","Feirantes","Entregadores","Pedidos","Categorias","Financeiro","Relatórios","Moderação"]};return <main className="mx-auto max-w-7xl px-4 py-8"><div className="flex items-center gap-3">{data.icon}<div><small className="font-bold text-green-700">FEIRAÊ</small><h1 className="text-3xl font-black">{data.title}</h1></div></div><div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">{["24 pedidos","R$ 1.842 vendas","8 pendentes","4,9 ★ avaliação"].map(x=><div className="rounded-2xl border bg-white p-5"><b className="text-xl">{x}</b></div>)}</div><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{data.items.map(x=><button className="rounded-2xl border bg-white p-5 text-left shadow-sm"><LayoutDashboard className="text-green-700"/><b className="mt-3 block">{x}</b><small className="text-slate-500">Gerenciar {x.toLowerCase()}</small></button>)}</div></main>}
