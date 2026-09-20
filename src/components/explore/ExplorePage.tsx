@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Sparkles, TrendingUp, Play, Lock, Heart, Radio, CalendarClock, Package, TicketPercent } from 'lucide-react';
+import { Search, Sparkles, TrendingUp, Play, Lock, Heart, Radio, CalendarClock } from 'lucide-react';
 import { Video, Creator, LivePreview } from '../../types';
 import { listCategories, loadExplore } from '../../services/accountData';
 import type { ProductTool } from '../product/ProductHub';
@@ -72,15 +72,6 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
           className="w-full pl-12 pr-4 py-3.5 bg-[#141419] border border-zinc-800 rounded-2xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-rose-500 transition-colors shadow-lg"
         />
       </div>
-
-      <section className="mb-6" aria-labelledby="explore-discovery-heading">
-        <h2 id="explore-discovery-heading" className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Descobrir</h2>
-        <div className="grid grid-cols-3 gap-2">
-          <button type="button" onClick={()=>onOpenTool('premieres')} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 text-left hover:border-rose-500/40"><Radio className="mb-2 h-4 w-4 text-rose-400"/><span className="text-xs font-bold">Estreias</span></button>
-          <button type="button" onClick={()=>onOpenTool('bundles')} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 text-left hover:border-rose-500/40"><Package className="mb-2 h-4 w-4 text-rose-400"/><span className="text-xs font-bold">Pacotes</span></button>
-          <button type="button" onClick={()=>onOpenTool('coupons')} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 text-left hover:border-rose-500/40"><TicketPercent className="mb-2 h-4 w-4 text-rose-400"/><span className="text-xs font-bold">Cupons</span></button>
-        </div>
-      </section>
 
       {/* Live and scheduled sessions */}
       {lives.length > 0 && <section className="mb-8" aria-labelledby="explore-live-heading">
@@ -156,6 +147,14 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
 
       {/* Category Pills */}
       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-4 mb-4">
+        <button
+          type="button"
+          onClick={() => onOpenTool('premieres')}
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-rose-500/30 bg-rose-500/10 px-3.5 py-1.5 text-xs font-semibold text-rose-300 transition hover:border-rose-400/60 hover:bg-rose-500/15"
+        >
+          <CalendarClock className="h-3.5 w-3.5" />
+          Estreias
+        </button>
         {categoriesList.map((cat) => (
           <button
             key={cat}
