@@ -46,6 +46,16 @@ export interface Creator {
   level_updated_at?: string;
 }
 
+export interface LivePreview {
+  id: string;
+  creator_id: string;
+  title: string;
+  status: 'live' | 'scheduled';
+  scheduled_at?: string;
+  required_plan: 'free' | 'plus' | 'vip';
+  creator?: Pick<Creator, 'id' | 'display_name' | 'handle' | 'avatar_url' | 'verified'>;
+}
+
 export interface Video {
   id: string;
   creator_id: string;

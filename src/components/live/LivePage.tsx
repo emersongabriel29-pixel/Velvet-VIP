@@ -21,6 +21,7 @@ export const LivePage:React.FC<{onBack:()=>void;initialLiveId?:string}>=({onBack
   const [feedback,setFeedback]=useState('');
   const [joining,setJoining]=useState<string|null>(null);
   const [player,setPlayer]=useState<PlayerState|null>(null);
+  const [focusedLiveId,setFocusedLiveId]=useState<string|null>(null);
   const [qualityOpen,setQualityOpen]=useState(false);
   const [hasLiked,setHasLiked]=useState(false);
   const [likesCount,setLikesCount]=useState(0);
@@ -112,7 +113,14 @@ export const LivePage:React.FC<{onBack:()=>void;initialLiveId?:string}>=({onBack
       setFeedback(raw.includes('Required platform plan')?'Esta live exige o plano indicado para acesso.':raw.includes('18+')?'Confirme sua maioridade antes de acessar a live.':raw.includes('provider')||raw.includes('source')?'A sala existe, mas o provedor de transmissão ainda não liberou o vídeo.':raw||'Não foi possível entrar na live.');
     }finally{setJoining(null);}
   };
-  useEffect(()=>{const target=initialLiveId&&lives.find(l=>l.id===initialLiveId&&l.status==='live');if(target&&!player&&!joining)void enterLive(target);},[initialLiveId,lives.length,isAuthenticated]);
+  useEffect(()=>{
+    const target=initialLiveId&&lives.find(l=>l.id===initialLiveId);
+    if(!target)return;
+    setFocusedLiveId(target.id);
+    document.querySelector(`[data-live-card-id="${target.id}"]`)?.scrollIntoView({behavior:'smooth',block:'center'});
+    if(target.status==='live'&&!player&&!joining)void enterLive(target);
+    if(target.status==='scheduled')setFeedback(`Live agendada para ${formatDate(target.scheduled_at)}.`);
+  },[initialLiveId,lives.length,isAuthenticated]);
 
   const toggle=(id:string)=>setReminded(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id]);
   const formatDate=(value?:string)=>value?new Date(value).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'Horário a confirmar';
@@ -130,7 +138,7 @@ export const LivePage:React.FC<{onBack:()=>void;initialLiveId?:string}>=({onBack
           lives.length===0?<div className="rounded-3xl border border-dashed border-zinc-700 p-12 text-center text-zinc-500">Nenhuma live publicada no momento.</div>:
           <div className="grid gap-5 md:grid-cols-3">
             {lives.map(live=>(
-              <article key={live.id} className="overflow-hidden rounded-3xl border border-zinc-800 bg-gradient-to-br from-rose-950 to-zinc-950">
+              <article key={live.id} data-live-card-id={live.id} className={`overflow-hidden rounded-3xl border bg-gradient-to-br from-rose-950 to-zinc-950 transition ${focusedLiveId===live.id?'border-rose-500 ring-2 ring-rose-500/30':'border-zinc-800'}`}>
                 <div className="flex h-44 items-end justify-between p-4">
                   <span className={`rounded-lg px-2 py-1 text-[10px] font-black ${live.status==='live'?'bg-rose-600':'bg-zinc-950/70'}`}>{live.status==='live'?'AO VIVO':'AGENDADA'}</span>
                   <span className="rounded-lg bg-black/40 px-2 py-1 text-[10px]">{live.required_plan==="free"?"GRÁTIS":live.required_plan.toUpperCase()}</span>

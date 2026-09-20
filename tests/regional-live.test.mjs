@@ -11,6 +11,9 @@ const video=read('src/components/feed/VideoCard.tsx');
 const authContext=read('src/hooks/useAuth.tsx');
 const header=read('src/components/common/Header.tsx');
 const profile=read('src/components/profile/ProfileView.tsx');
+const explore=read('src/components/explore/ExplorePage.tsx');
+const app=read('src/App.tsx');
+const accountData=read('src/services/accountData.ts');
 
 test('live engagement and paid offers are RLS protected',()=>{
   for(const table of ['live_likes','live_comments','live_shares','live_offers','live_offer_orders']){
@@ -48,4 +51,16 @@ test('profile avatar is left aligned, raised and fully contained',()=>{
   assert.match(profile,/absolute -bottom-8 left-5 sm:left-8/);
   assert.match(profile,/rounded-full object-contain object-center/);
   assert.doesNotMatch(profile,/rounded-3xl overflow-hidden bg-gradient-to-r/);
+});
+
+test('featured lives open the selected session from explore and creator profiles',()=>{
+  assert.match(accountData,/from\('live_sessions'\)/);
+  assert.match(accountData,/\.in\('status', \['live', 'scheduled'\]\)/);
+  assert.match(explore,/Lives em destaque/);
+  assert.match(explore,/onOpenLive\(live\.id\)/);
+  assert.match(explore,/liveCreatorIds\.has\(c\.id\)/);
+  assert.match(profile,/onOpenLive\?\.\(l\.id\)/);
+  assert.match(app,/onOpenLive=\{handleOpenLive\}/);
+  assert.match(live,/data-live-card-id/);
+  assert.match(live,/target\.status==='live'/);
 });

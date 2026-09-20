@@ -1,22 +1,25 @@
 import React, { useState } from 'react';
-import { Search, Sparkles, TrendingUp, Play, Lock, Heart, Users } from 'lucide-react';
-import { Video, Creator } from '../../types';
+import { Search, Sparkles, TrendingUp, Play, Lock, Heart, Radio, CalendarClock } from 'lucide-react';
+import { Video, Creator, LivePreview } from '../../types';
 import { listCategories, loadExplore } from '../../services/accountData';
 
 interface ExplorePageProps {
   onSelectVideo: (videoId: string) => void;
   onSelectCreator: (creatorId: string) => void;
+  onOpenLive: (liveId: string) => void;
 }
 
 export const ExplorePage: React.FC<ExplorePageProps> = ({
   onSelectVideo,
   onSelectCreator,
+  onOpenLive,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
   const [categoriesList, setCategoriesList] = useState<string[]>(['Todos']);
   const [creators, setCreators] = useState<Creator[]>([]);
   const [allVideos, setVideos] = useState<Video[]>([]);
+  const [lives, setLives] = useState<LivePreview[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -25,11 +28,16 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
     Promise.all([listCategories(), loadExplore()]).then(([categories, result]) => {
       if (!active) return;
       setCategoriesList(['Todos', ...categories.map(c => c.name)]);
-      setCreators(result.creators); setVideos(result.videos);
+      setCreators(result.creators); setVideos(result.videos); setLives(result.lives);
     }).catch(() => { if (active) setError('Não foi possível carregar o catálogo. Tente novamente.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
+
+  const liveCreatorIds = new Set(lives.filter(live => live.status === 'live').map(live => live.creator_id));
+  const formatSchedule = (value?: string) => value
+    ? new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : 'Horário a confirmar';
 
 
 
@@ -62,6 +70,40 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
         />
       </div>
 
+      {/* Live and scheduled sessions */}
+      {lives.length > 0 && <section className="mb-8" aria-labelledby="explore-live-heading">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 id="explore-live-heading" className="flex items-center gap-2 text-sm font-bold text-white font-display">
+            <Radio className="h-4 w-4 text-rose-500" /> Lives em destaque
+          </h3>
+          <span className="text-[11px] text-zinc-400">{lives.filter(live => live.status === 'live').length} ao vivo</span>
+        </div>
+        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+          {lives.map(live => <button
+            key={live.id}
+            type="button"
+            data-explore-live-id={live.id}
+            onClick={() => onOpenLive(live.id)}
+            className={`group w-64 shrink-0 overflow-hidden rounded-2xl border text-left transition ${live.status === 'live' ? 'border-rose-500/40 bg-gradient-to-br from-rose-950/80 to-zinc-950 hover:border-rose-400' : 'border-zinc-800 bg-zinc-900/70 hover:border-amber-500/50'}`}
+          >
+            <div className="flex items-center gap-3 p-4">
+              <div className="relative h-14 w-14 shrink-0 rounded-full border-2 border-zinc-800 bg-zinc-950 p-0.5">
+                {live.creator?.avatar_url ? <img src={live.creator.avatar_url} alt="" className="h-full w-full rounded-full object-cover" referrerPolicy="no-referrer" /> : <Radio className="m-3.5 h-5 w-5 text-rose-400" />}
+                {live.status === 'live' && <span className="absolute inset-0 rounded-full ring-2 ring-rose-500/70 animate-pulse" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-black ${live.status === 'live' ? 'bg-rose-600 text-white' : 'bg-amber-500/15 text-amber-300'}`}>
+                  {live.status === 'live' ? <><span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> AO VIVO</> : <><CalendarClock className="h-3 w-3" /> AGENDADA</>}
+                </span>
+                <p className="mt-1.5 truncate text-sm font-bold text-white">{live.title}</p>
+                <p className="truncate text-[11px] text-zinc-400">{live.creator?.display_name || 'Criador verificado'}</p>
+                <p className="mt-1 text-[10px] text-zinc-500">{live.status === 'live' ? 'Abrir transmissão' : formatSchedule(live.scheduled_at)}</p>
+              </div>
+            </div>
+          </button>)}
+        </div>
+      </section>}
+
       {/* Trending Creators Carousel */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-3">
@@ -79,7 +121,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
               onClick={() => onSelectCreator(c.id)}
               className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer group w-20"
             >
-              <div className="relative w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-400 group-hover:scale-105 transition-transform shadow-md">
+              <div className={`relative w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-400 group-hover:scale-105 transition-transform shadow-md ${liveCreatorIds.has(c.id) ? 'ring-2 ring-rose-500 ring-offset-2 ring-offset-[#09090b] animate-pulse' : ''}`}>
                 <img
                   src={c.avatar_url}
                   alt={c.display_name}
@@ -87,6 +129,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
                   referrerPolicy="no-referrer"
                 />
                 <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400 absolute -top-1 -right-1" />
+                {liveCreatorIds.has(c.id) && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded bg-rose-600 px-1.5 py-0.5 text-[8px] font-black text-white">LIVE</span>}
               </div>
               <span className="text-xs font-semibold text-zinc-200 text-center truncate w-full group-hover:text-white">
                 {c.display_name}

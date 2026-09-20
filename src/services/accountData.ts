@@ -1,7 +1,7 @@
 import { supabase, isDemoMode } from '../lib/supabase';
 import { dbService } from './db';
 import { resolvePrivateMediaRefs } from './media';
-import type { Creator, Notification, Subscription, SystemCategory, Video, ReportReason } from '../types';
+import type { Creator, LivePreview, Notification, Subscription, SystemCategory, Video, ReportReason } from '../types';
 
 function client() {
   if (!supabase) throw new Error('Conexão indisponível. Tente novamente.');
@@ -22,24 +22,32 @@ export async function listCategories(): Promise<SystemCategory[]> {
   return data || [];
 }
 
-export async function loadExplore(): Promise<{ creators: Creator[]; videos: Video[] }> {
-  if (isDemoMode) return { creators: dbService.getCreators(), videos: dbService.getVideos('foryou') };
+export async function loadExplore(): Promise<{ creators: Creator[]; videos: Video[]; lives: LivePreview[] }> {
+  if (isDemoMode) return { creators: dbService.getCreators(), videos: dbService.getVideos('foryou'), lives: [] };
   const api = client();
-  const [creators, videos] = await Promise.all([
+  const [creators, videos, lives] = await Promise.all([
     api.from('creators').select('*').eq('is_approved', true).order('total_followers', { ascending: false }).limit(50),
     api.from('videos').select('*, creator:creators(*)').eq('is_draft', false).eq('is_removed', false)
       .eq('moderation_status', 'approved').eq('media_status', 'ready').eq('processing_status', 'ready')
       .order('is_premium').order('created_at', { ascending: false }).limit(100),
+    api.from('live_sessions')
+      .select('id,creator_id,title,status,scheduled_at,required_plan,creator:creators(id,display_name,handle,avatar_url,verified)')
+      .in('status', ['live', 'scheduled']).eq('moderation_status', 'approved')
+      .order('status').order('scheduled_at', { ascending: true }).limit(30),
   ]);
-  if (creators.error || videos.error) throw creators.error || videos.error;
+  if (creators.error || videos.error || lives.error) throw creators.error || videos.error || lives.error;
   const refs = await resolvePrivateMediaRefs([
     ...(creators.data || []).map(c => c.avatar_url),
     ...(videos.data || []).flatMap(v => [v.thumbnail_url, v.creator?.avatar_url]),
+    ...(lives.data || []).map((live: any) => live.creator?.avatar_url),
   ]);
   return {
     creators: (creators.data || []).map(c => ({ ...c, avatar_url: refs.get(c.avatar_url) || '' })),
     videos: (videos.data || []).map(v => ({ ...v, thumbnail_url: refs.get(v.thumbnail_url) || '',
       creator: v.creator ? { ...v.creator, avatar_url: refs.get(v.creator.avatar_url) || '' } : undefined })),
+    lives: (lives.data || []).map((live: any) => ({ ...live,
+      creator: live.creator ? { ...live.creator, avatar_url: refs.get(live.creator.avatar_url) || '' } : undefined,
+    })) as LivePreview[],
   };
 }
 

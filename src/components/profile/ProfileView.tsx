@@ -37,7 +37,7 @@ interface ProfileViewProps {
   onOpenUpload: () => void;
   onOpenLgpd?: () => void;
   onOpenAuth?: () => void;
-  onOpenLive?: () => void;
+  onOpenLive?: (liveId?: string) => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
@@ -265,7 +265,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full object-contain object-center border-4 shadow-2xl bg-zinc-900 ${profileLives.some(l => l.status === "live") ? "border-rose-500 ring-4 ring-rose-500/25" : "border-[#09090b]"}`}
               referrerPolicy="no-referrer"
             />
-            {profileLives.some(l => l.status === "live") && <button type="button" onClick={onOpenLive} className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-rose-600 px-3 py-1 text-[10px] font-black text-white shadow-lg">AO VIVO</button>}
+            {profileLives.some(l => l.status === "live") && <button type="button" onClick={()=>onOpenLive?.(profileLives.find(l=>l.status==='live')?.id)} className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-rose-600 px-3 py-1 text-[10px] font-black text-white shadow-lg">AO VIVO</button>}
             {creator?.verified && (
               <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-500 border-2 border-[#09090b] flex items-center justify-center text-white shadow">
                 <Crown className="w-4 h-4 fill-white" />
@@ -431,7 +431,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       </div>
 
-      {creator && (profileLives.length > 0 || profileHighlights.length > 0) && <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="font-bold flex items-center gap-2"><Radio className="w-4 h-4 text-rose-500"/>Lives e destaques</h2>{profileLives.length>0&&onOpenLive&&<button onClick={onOpenLive} className="text-xs text-rose-400">Ver lives</button>}</div><div className="flex gap-4 overflow-x-auto pb-2">{profileLives.map(l=><button key={l.id} onClick={onOpenLive} className="w-24 shrink-0 text-center"><div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border-2 ${l.status==='live'?'border-rose-500 bg-rose-950/30':'border-amber-500 bg-zinc-900'}`}><Radio className={`h-7 w-7 ${l.status==='live'?'text-rose-400':'text-amber-300'}`}/></div><p className="mt-2 truncate text-xs font-bold">{l.status==='live'?'AO VIVO':l.title}</p></button>)}{profileHighlights.map(h=><button key={h.id} onClick={()=>setSelectedHighlight(h)} className="w-24 shrink-0 text-center"><div className="mx-auto h-20 w-20 overflow-hidden rounded-full border-2 border-zinc-700 bg-zinc-900">{h.display_url&&<img src={h.display_url} alt={h.title} className="h-full w-full object-cover"/>}</div><p className="mt-2 truncate text-xs font-bold">{h.title}</p></button>)}</div></section>}
+      {creator && (profileLives.length > 0 || profileHighlights.length > 0) && <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="font-bold flex items-center gap-2"><Radio className="w-4 h-4 text-rose-500"/>Lives e destaques</h2>{profileLives.length>0&&onOpenLive&&<button onClick={()=>onOpenLive(profileLives[0]?.id)} className="text-xs text-rose-400">Ver lives</button>}</div><div className="flex gap-4 overflow-x-auto pb-2">{profileLives.map(l=><button key={l.id} onClick={()=>onOpenLive?.(l.id)} className="w-24 shrink-0 text-center"><div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border-2 ${l.status==='live'?'border-rose-500 bg-rose-950/30 animate-pulse':'border-amber-500 bg-zinc-900'}`}><Radio className={`h-7 w-7 ${l.status==='live'?'text-rose-400':'text-amber-300'}`}/></div><p className="mt-2 truncate text-xs font-bold">{l.status==='live'?'AO VIVO':l.title}</p></button>)}{profileHighlights.map(h=><button key={h.id} onClick={()=>setSelectedHighlight(h)} className="w-24 shrink-0 text-center"><div className="mx-auto h-20 w-20 overflow-hidden rounded-full border-2 border-zinc-700 bg-zinc-900">{h.display_url&&<img src={h.display_url} alt={h.title} className="h-full w-full object-cover"/>}</div><p className="mt-2 truncate text-xs font-bold">{h.title}</p></button>)}</div></section>}
 
       {selectedHighlight&&<div onClick={()=>setSelectedHighlight(null)} className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"><div onClick={e=>e.stopPropagation()} className="w-full max-w-lg overflow-hidden rounded-3xl border border-zinc-800 bg-[#111116] shadow-2xl">{selectedHighlight.media_type==='video'?<video src={selectedHighlight.display_url} controls autoPlay playsInline className="max-h-[70vh] w-full bg-black object-contain"/>:<img src={selectedHighlight.display_url} alt={selectedHighlight.title} className="max-h-[70vh] w-full bg-black object-contain"/>}<div className="flex items-center justify-between gap-3 p-4"><div><p className="text-[10px] font-bold uppercase tracking-[.2em] text-rose-400">Destaque</p><h3 className="font-bold">{selectedHighlight.title}</h3></div><button onClick={()=>setSelectedHighlight(null)} className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold">Fechar</button></div></div></div>}
 
