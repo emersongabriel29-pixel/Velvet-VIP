@@ -1,51 +1,63 @@
 # Feiraê
 
-Marketplace das feiras do DF.
+**A feira do seu jeito.**
 
-> A feira do seu jeito.
+Marketplace das feiras do Distrito Federal, com alimentos, artesanato, moda, plantas, utilidades e outros produtos.
 
-## MVP atual
+## GPS e localização
+- “Usar minha localização” via Geolocation API.
+- GPS opcional: se o cliente negar, pode informar endereço/região manualmente.
+- Feiras ordenadas por proximidade.
+- Distância cliente → feira.
+- Botão para abrir rota no mapa.
+- Latitude/longitude para feiras e pontos de venda.
+- Endereço de entrega como destino.
+- Arquitetura preparada para rastreamento de entregador em tempo real.
+- Geolocalização tratada como dado privado e usada com consentimento.
 
-A primeira versão é um protótipo funcional de interface do cliente com:
+## Produto
+- múltiplas feiras do DF;
+- múltiplos feirantes por feira;
+- loja digital de cada feirante;
+- alimentos e produtos não alimentícios;
+- entrega e retirada;
+- carrinho “Minha Feira”;
+- pedidos e acompanhamento;
+- compra de vários feirantes em um checkout, com divisão interna por vendedor;
+- avaliações, favoritos e notificações;
+- painel de cliente, feirante, entregador e administração;
+- futuro painel de gestão da feira.
 
-- busca de produtos, feirantes e feiras;
-- categorias;
-- feiras em destaque;
-- catálogo de produtos;
-- favoritos (interface);
-- carrinho "Minha Feira";
-- controle de quantidade;
-- navegação inicial para pedidos e perfil;
-- responsividade mobile/desktop.
+## Arquitetura de dados
+Prever latitude/longitude em feiras, pontos de venda e endereços. Para consultas por distância/raio, usar PostGIS no Supabase.
 
-## Arquitetura planejada
+Tabelas previstas:
+profiles, vendor_profiles, delivery_profiles, fairs, fair_vendor_memberships, vendor_stores, categories, products, product_images, inventory, addresses, carts, cart_items, orders, order_items, order_vendors, payments, deliveries, reviews, favorites, notifications, promotions, audit_logs.
 
-- React + Vite + TypeScript
-- Tailwind CSS
-- Supabase Auth + PostgreSQL + RLS
-- Storage para imagens
-- pagamentos server-side
-- pedidos multi-feirante
-- entrega e retirada
-- painéis de cliente, feirante, entregador e administração
+## Segurança
+- RLS no Supabase.
+- Nunca confiar em preço enviado pelo cliente.
+- Validar estoque e propriedade do vendedor no servidor.
+- Mutações financeiras server-side.
+- Webhooks idempotentes.
+- Logs de auditoria.
+- Localização somente com consentimento.
 
-## Regra de produto
-
-O Feiraê é um produto independente. O projeto Velvet-VIP não será alterado para incorporar regras de negócio do Feiraê.
+## Roadmap
+1. Supabase + schema/PostGIS.
+2. Autenticação e perfis.
+3. Feiras/feirantes e catálogo.
+4. GPS/endereço e busca por proximidade.
+5. Carrinho persistente.
+6. Pedidos multi-feirante.
+7. Painel do feirante.
+8. Checkout e pagamento.
+9. Entrega e rastreamento.
+10. Avaliações, notificações e promoções.
 
 ## Desenvolvimento
-
-```bash
 cd feirae
 npm install
 npm run dev
-```
 
-## Próxima fase
-
-1. Modelar o banco Supabase.
-2. Autenticação e perfis.
-3. Cadastro de feiras/feirantes/produtos.
-4. Persistência do catálogo e carrinho.
-5. Checkout de teste.
-6. Pedidos e painel do feirante.
+O Feiraê permanece separado das regras de negócio do Velvet-VIP.
