@@ -16,6 +16,8 @@ const isHlsSource = (url?: string, type?: string) =>
 export const AdaptiveVideo = forwardRef<HTMLVideoElement, AdaptiveVideoProps>(
   ({ sourceUrl, sourceType, onPlaybackError, ...props }, forwardedRef) => {
     const localRef = useRef<HTMLVideoElement>(null);
+    const errorCallback = useRef(onPlaybackError);
+    errorCallback.current = onPlaybackError;
 
     useImperativeHandle(forwardedRef, () => localRef.current as HTMLVideoElement);
 
@@ -25,6 +27,7 @@ export const AdaptiveVideo = forwardRef<HTMLVideoElement, AdaptiveVideoProps>(
 
       let hls: Hls | null = null;
       let disposed = false;
+      let recoveries = 0;
 
       const clearNativeSource = () => {
         video.removeAttribute('src');
@@ -52,20 +55,20 @@ export const AdaptiveVideo = forwardRef<HTMLVideoElement, AdaptiveVideoProps>(
           hls.attachMedia(video);
           hls.on(Hls.Events.ERROR, (_event, data) => {
             if (disposed || !data.fatal || !hls) return;
-            if (data.type === ErrorTypes.NETWORK_ERROR) {
+            if (data.type === ErrorTypes.NETWORK_ERROR && recoveries++ < 2) {
               hls.startLoad();
               return;
             }
-            if (data.type === ErrorTypes.MEDIA_ERROR) {
+            if (data.type === ErrorTypes.MEDIA_ERROR && recoveries++ < 2) {
               hls.recoverMediaError();
               return;
             }
-            onPlaybackError?.('Não foi possível reproduzir este stream.');
+            errorCallback.current?.('Não foi possível reproduzir este stream.');
             hls.destroy();
             hls = null;
           });
         } else {
-          onPlaybackError?.('Este navegador não oferece suporte à transmissão HLS.');
+          errorCallback.current?.('Este navegador não oferece suporte à transmissão HLS.');
         }
       } else {
         video.src = sourceUrl;
@@ -77,7 +80,7 @@ export const AdaptiveVideo = forwardRef<HTMLVideoElement, AdaptiveVideoProps>(
         if (hls) hls.destroy();
         clearNativeSource();
       };
-    }, [sourceUrl, sourceType, onPlaybackError]);
+    }, [sourceUrl, sourceType]);
 
     return <video ref={localRef} {...props} />;
   },

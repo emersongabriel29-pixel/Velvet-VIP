@@ -46,6 +46,31 @@ export interface Creator {
   level_updated_at?: string;
 }
 
+export interface LivePreview {
+  id: string;
+  creator_id: string;
+  title: string;
+  status: 'live' | 'scheduled';
+  scheduled_at?: string;
+  required_plan: 'free' | 'plus' | 'vip';
+  creator?: Pick<Creator, 'id' | 'display_name' | 'handle' | 'avatar_url' | 'verified'>;
+}
+
+export interface AdCampaign {
+  id: string;
+  name: string;
+  advertiser_name: string;
+  creative_url?: string;
+  target_url?: string;
+  placement: 'feed' | 'explore' | 'banner';
+  status: 'draft' | 'active' | 'paused' | 'finished';
+  audience?: 'all' | 'free' | 'subscribers' | 'creators';
+  start_at?: string;
+  end_at?: string;
+  starts_at?: string;
+  ends_at?: string;
+}
+
 export interface Video {
   id: string;
   creator_id: string;
@@ -74,6 +99,7 @@ export interface Video {
   moderation_status?: 'pending' | 'approved' | 'rejected' | 'removed';
   moderation_notes?: string;
   consent_confirmed?: boolean;
+  watermark_enabled?: boolean;
   created_at: string;
   // Dynamic runtime properties for current user
   creator?: Creator;

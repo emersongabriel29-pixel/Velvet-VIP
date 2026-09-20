@@ -15,24 +15,29 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Star
+  Star,
+  Target,
+  Clapperboard
 } from 'lucide-react';
 import { Creator, Video, Withdrawal } from '../../types';
 import { dbService } from '../../services/db';
 import { useAuth } from '../../hooks/useAuth';
 import { CreatorAnalyticsPanel } from './CreatorAnalyticsPanel';
 import { CreatorPlansManager } from './CreatorPlansManager';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured, isDemoMode } from '../../lib/supabase';
 import { uploadProfileImage, getProfileImageUrl } from '../../services/media';
+import type { ProductTool } from '../product/ProductHub';
 
 interface CreatorDashboardProps {
   onOpenUpload: () => void;
   onSelectVideo: (videoId: string) => void;
+  onOpenTool: (tool: ProductTool) => void;
 }
 
 export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   onOpenUpload,
   onSelectVideo,
+  onOpenTool,
 }) => {
   const { currentCreator } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'videos' | 'highlights' | 'plans' | 'payouts'>('overview');
@@ -47,12 +52,12 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   const [pixKeyType, setPixKeyType] = useState('cpf');
   const [pixKey, setPixKey] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('500');
+  const [payoutCurrency,setPayoutCurrency]=useState<'BRL'|'USD'>(()=>navigator.language.toLowerCase().startsWith('en')?'USD':'BRL');
+  const [payoutCountry,setPayoutCountry]=useState<'BR'|'US'>(()=>navigator.language.toLowerCase().startsWith('en')?'US':'BR');
+  const [fxRates,setFxRates]=useState<Record<string,number>>({BRL:1,USD:5.3});
   const [payoutMessage, setPayoutMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Subscription plan prices state
-  const [basicPrice, setBasicPrice] = useState(29.90);
-  const [vipPrice, setVipPrice] = useState(59.90);
-  const [plansSaved, setPlansSaved] = useState(false);
   const [pageCopy,setPageCopy]=useState({title:'Creator Studio',subtitle:'Publique, faça lives e monetize sua comunidade.'});
 
   const creator: Creator = currentCreator || {
@@ -65,11 +70,11 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
     verified: true,
     subscription_price_basic: 29.90,
     subscription_price_vip: 59.90,
-    total_followers: 12450,
-    total_likes: 84200,
-    total_views: 450000,
-    wallet_balance: 3840.50,
-    total_earnings: 12540.00,
+    total_followers: 0,
+    total_likes: 0,
+    total_views: 0,
+    wallet_balance: 0,
+    total_earnings: 0,
     created_at: new Date().toISOString(),
   };
 
@@ -80,11 +85,12 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
 
   const loadData = async () => {
     if (!creator.id) return;
-    if (!isSupabaseConfigured || !supabase) {
+    if (isDemoMode) {
       setVideos(dbService.getVideosByCreator(creator.id));
       setWithdrawals(dbService.getWithdrawals());
       return;
     }
+    if (!supabase) { setVideos([]); setWithdrawals([]); return; }
     const [videoRows,withdrawalRows]=await Promise.all([
       supabase.from('videos').select('*').eq('creator_id',creator.id).order('created_at',{ascending:false}),
       supabase.from('withdrawals').select('*').eq('creator_id',creator.id).order('created_at',{ascending:false})
@@ -111,16 +117,16 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
 
   useEffect(() => {
     if(isSupabaseConfigured && supabase){supabase.from('app_content_settings').select('creator_page_title,creator_page_subtitle').eq('id','global').maybeSingle().then(({data})=>{if(data)setPageCopy({title:data.creator_page_title||'Creator Studio',subtitle:data.creator_page_subtitle||'Publique, faça lives e monetize sua comunidade.'});});}
+    if(isSupabaseConfigured && supabase){supabase.from('app_content_settings').select('fx_rates').eq('id','global').maybeSingle().then(({data})=>{if(data?.fx_rates)setFxRates(data.fx_rates);});}
     void loadData();
     void loadHighlights();
-    setBasicPrice(creator.subscription_price_basic || 29.90);
-    setVipPrice(creator.subscription_price_vip || 59.90);
   }, [currentCreator]);
 
   const handleDeleteVideo = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Remover este vídeo? Ele deixará de aparecer para os usuários.')) return;
-    if(!isSupabaseConfigured || !supabase){ dbService.deleteVideo(id); await loadData(); return; }
+    if(isDemoMode){ dbService.deleteVideo(id); await loadData(); return; }
+    if(!supabase){setPayoutMessage({type:'error',text:'Supabase não configurado.'});return;}
     const {error}=await supabase.from('videos').update({is_removed:true,moderation_status:'removed'}).eq('id',id).eq('creator_id',creator.id);
     if(error) setPayoutMessage({type:'error',text:error.message}); else await loadData();
   };
@@ -129,12 +135,13 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
     e.preventDefault();
     const amt = parseFloat(withdrawAmount);
     if (isNaN(amt) || amt <= 0) { setPayoutMessage({ type: 'error', text: 'Informe um valor válido para saque.' }); return; }
-    if(!pixKey.trim()){setPayoutMessage({type:'error',text:'Informe sua chave PIX.'});return;}
+    if(!pixKey.trim()){setPayoutMessage({type:'error',text:'Informe o destino bancário do saque.'});return;}
     try {
-      if(!isSupabaseConfigured || !supabase){
+      if(isDemoMode){
         dbService.requestWithdrawal(creator.id, amt, pixKey, pixKeyType);
       }else{
-        const {error}=await supabase.rpc('request_creator_withdrawal',{p_amount:amt,p_pix_key:pixKey.trim(),p_pix_key_type:pixKeyType});
+        if(!supabase) throw new Error('Supabase não configurado.');
+        const {error}=await supabase.rpc('request_creator_withdrawal_regional',{p_amount_brl:amt,p_destination:pixKey.trim(),p_destination_type:pixKeyType,p_payout_currency:payoutCurrency,p_country:payoutCountry});
         if(error) throw error;
       }
       setPayoutMessage({ type: 'success', text: 'Solicitação de saque registrada para análise.' });
@@ -147,12 +154,6 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
     }
   };
 
-  const handleSavePlans = (e: React.FormEvent) => {
-    e.preventDefault();
-    dbService.updateCreatorPlans(creator.id, basicPrice, vipPrice);
-    setPlansSaved(true);
-    setTimeout(() => setPlansSaved(false), 2500);
-  };
 
   return (
     <div className="min-h-screen bg-[#09090b] text-white pt-16 pb-20 max-w-5xl mx-auto px-4 sm:px-6">
@@ -255,7 +256,12 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
       </div>
 
       <CreatorAnalyticsPanel creatorId={creator.id} fallback={{ followers: creator.total_followers, views: creator.total_views, likes: creator.total_likes, comments: 0, earnings: creator.total_earnings || 0 }} />
-      <CreatorPlansManager creatorId={creator.id} />
+
+      <section className="my-6 grid grid-cols-2 gap-3" aria-label="Ferramentas do criador">
+        <button type="button" onClick={()=>onOpenTool('goals')} className="flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 text-left hover:border-amber-500/40"><Target className="h-5 w-5 text-amber-400"/><span><span className="block text-sm font-bold">Metas</span><span className="text-xs text-zinc-500">Objetivos da comunidade</span></span></button>
+        <button type="button" onClick={()=>onOpenTool('clips')} className="flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 text-left hover:border-rose-500/40"><Clapperboard className="h-5 w-5 text-rose-400"/><span><span className="block text-sm font-bold">Clipes de lives</span><span className="text-xs text-zinc-500">Cortes das transmissões</span></span></button>
+      </section>
+
 
       {/* Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-zinc-800 pb-3 mb-6 overflow-x-auto no-scrollbar">
@@ -444,63 +450,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
         </div>
       )}
 
-      {/* Tab 3: Subscription Plans Config */}
-      {activeTab === 'plans' && (
-        <div className="max-w-xl space-y-6">
-          <div className="p-6 rounded-3xl bg-[#141419] border border-zinc-800 space-y-4">
-            <div>
-              <h3 className="text-base font-bold text-white font-display">Configurar Preços de Assinatura Mensal</h3>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Defina o valor cobrado mensalmente dos seus membros VIP para acessar seus conteúdos exclusivos.
-              </p>
-            </div>
-
-            {plansSaved && (
-              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Preços atualizados com sucesso!</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSavePlans} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Plano Básico (Mensal em R$):
-                </label>
-                <input
-                  type="number"
-                  step="0.10"
-                  min="9.90"
-                  value={basicPrice}
-                  onChange={(e) => setBasicPrice(parseFloat(e.target.value) || 0)}
-                  className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-xs text-white focus:outline-none focus:border-rose-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Plano VIP Gold (Mensal em R$):
-                </label>
-                <input
-                  type="number"
-                  step="0.10"
-                  min="19.90"
-                  value={vipPrice}
-                  onChange={(e) => setVipPrice(parseFloat(e.target.value) || 0)}
-                  className="w-full px-4 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-xs text-white focus:outline-none focus:border-rose-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/50 cursor-pointer"
-              >
-                Salvar Novos Preços
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {activeTab === 'plans' && <CreatorPlansManager creatorId={creator.id} />}
 
       {/* Tab 4: Payouts & PIX */}
       {activeTab === 'payouts' && (
@@ -510,7 +460,7 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
             <div>
               <h3 className="text-base font-bold text-white font-display flex items-center gap-2">
                 <QrCode className="w-5 h-5 text-emerald-400" />
-                <span>Solicitar Saque via PIX</span>
+                <span>Solicitar saque regional</span>
               </h3>
               <p className="text-xs text-zinc-400 mt-0.5">
                 Transfira seus ganhos diretamente para sua conta bancária sem burocracia.
@@ -535,25 +485,26 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
             )}
 
             <form onSubmit={handleRequestPayout} className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block text-xs font-semibold text-zinc-300">País<select value={payoutCountry} onChange={e=>{const country=e.target.value as 'BR'|'US';setPayoutCountry(country);setPayoutCurrency(country==='US'?'USD':'BRL');setPixKeyType(country==='US'?'bank_account':'cpf')}} className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs"><option value="BR">Brasil</option><option value="US">Estados Unidos</option></select></label>
+                <label className="block text-xs font-semibold text-zinc-300">Moeda de recebimento<select value={payoutCurrency} onChange={e=>setPayoutCurrency(e.target.value as 'BRL'|'USD')} className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs"><option value="BRL">Real (BRL)</option><option value="USD">Dólar (USD)</option></select></label>
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Tipo de Chave PIX:
+                  Tipo de destino:
                 </label>
                 <select
                   value={pixKeyType}
                   onChange={(e) => setPixKeyType(e.target.value)}
                   className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-xs text-white focus:outline-none focus:border-rose-500"
                 >
-                  <option value="cpf">CPF / CNPJ</option>
-                  <option value="email">E-mail</option>
-                  <option value="phone">Telefone Celular</option>
-                  <option value="random">Chave Aleatória (EVP)</option>
+                  {payoutCountry==='BR'?<><option value="cpf">PIX • CPF / CNPJ</option><option value="email">PIX • E-mail</option><option value="phone">PIX • Telefone</option><option value="random">PIX • Chave aleatória</option></>:<><option value="bank_account">Conta bancária</option><option value="routing_account">Routing + account</option></>}
                 </select>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                  Sua Chave PIX:
+                  Destino bancário:
                 </label>
                 <input
                   type="text"
@@ -583,13 +534,14 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
                 <span className="text-[11px] text-zinc-500 mt-1 block">
                   Disponível para saque: <strong>R$ {(creator.available_balance ?? creator.wallet_balance ?? 0).toFixed(2).replace('.', ',')}</strong>
                 </span>
+                {payoutCurrency!=='BRL'&&<span className="mt-1 block text-[11px] text-amber-300">Cotação administrativa: aproximadamente {new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number(withdrawAmount||0)/Number(fxRates.USD||1))}. A cotação fica registrada no pedido.</span>}
               </div>
 
               <button
                 type="submit"
                 className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-emerald-950/40 cursor-pointer"
               >
-                Confirmar Saque PIX
+                Confirmar saque
               </button>
             </form>
           </div>

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Home, Compass, Plus, Bell, User as UserIcon, ShieldAlert, Grid2X2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { dbService } from '../../services/db';
+import { loadNotifications } from '../../services/accountData';
+import { useLocale } from '../../hooks/useLocale';
 
 interface BottomNavProps {
   activeView: string;
@@ -17,7 +18,16 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   onOpenAuthModal,
 }) => {
   const { currentUser, isAuthenticated } = useAuth();
-  const unreadCount = (isAuthenticated ? dbService.getNotifications() : dbService.getVisitorNotifications()).filter(n => !n.read).length;
+  const {t}=useLocale();
+  const [unreadCount, setUnreadCount] = useState(0);
+  useEffect(() => {
+    let active = true; setUnreadCount(0);
+    const refresh = () => { if (isAuthenticated) loadNotifications().then(rows => { if (active) setUnreadCount(rows.filter(n => !n.read).length); }).catch(() => { if (active) setUnreadCount(0); }); };
+    refresh(); const timer = window.setInterval(refresh, 30000);
+    window.addEventListener('velvet-notifications-updated', refresh);
+    window.addEventListener('focus', refresh);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener('velvet-notifications-updated', refresh); window.removeEventListener('focus', refresh); };
+  }, [isAuthenticated, currentUser.id]);
 
   return (
     <nav
@@ -35,7 +45,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         >
           <Home className={`w-5 h-5 ${activeView === 'feed' ? 'stroke-[2.5px] text-rose-500' : ''}`} />
           <span className={`text-[10px] ${activeView === 'feed' ? 'font-bold text-white' : 'font-medium'}`}>
-            Início
+            {t('home')}
           </span>
         </button>
 
@@ -49,7 +59,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         >
           <Compass className={`w-5 h-5 ${activeView === 'explore' ? 'stroke-[2.5px] text-rose-500' : ''}`} />
           <span className={`text-[10px] ${activeView === 'explore' ? 'font-bold text-white' : 'font-medium'}`}>
-            Explorar
+            {t('explore')}
           </span>
         </button>
 
@@ -82,7 +92,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             )}
           </div>
           <span className={`text-[10px] ${activeView === 'activity' ? 'font-bold text-white' : 'font-medium'}`}>
-            Atividade
+            {t('activity')}
           </span>
         </button>
 
@@ -101,7 +111,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             )}
           </div>
           <span className={`text-[10px] ${activeView === 'profile' || activeView === 'creator_studio' ? 'font-bold text-white' : 'font-medium'}`}>
-            {isAuthenticated ? 'Perfil' : 'Entrar'}
+            {isAuthenticated ? t('profile') : t('login')}
           </span>
         </button>
 

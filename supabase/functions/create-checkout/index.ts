@@ -25,13 +25,20 @@ Deno.serve(async (req) => {
   if (limited.error || limited.data !== true) return json(req,{ error: 'Muitas tentativas. Tente novamente em instantes.' }, 429);
   const now = new Date().toISOString();
   const restriction = await admin.from('account_restrictions').select('id').eq('subject_user_id', user.id).eq('is_active', true).in('scope', ['account','purchase']).lte('starts_at', now).or(`ends_at.is.null,ends_at.gt.${now}`).limit(1);
+  if (restriction.error) return json(req,{error:'Não foi possível verificar as restrições.'},503);
   if (restriction.data?.length) return json(req,{ error: 'Conta temporariamente impedida de realizar compras.' }, 403);
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return json(req,{error:'Dados inválidos.'},400);
   const kind = body.kind;
   let amount = 0;
   let description = '';
   let referenceId: string | null = null;
   const metadata: Record<string, unknown> = { kind };
+  const requestedCurrency=String(body.currency||'BRL').toUpperCase();
+  // Mercado Pago Brazil settles this project in BRL. Persisting/charging a USD
+  // amount as BRL would be financially incorrect, so other currencies fail closed
+  // until a matching regional gateway is configured.
+  if(requestedCurrency!=='BRL') return json(req,{error:'Pagamentos em USD exigem um gateway regional configurado pelo administrador.',code:'unsupported_checkout_currency'},422);
 
   if (kind === 'platform_plan' && body.planId) {
     const { data: plan } = await admin.from('platform_plans').select('id,name,monthly_price,is_active').eq('id', body.planId).single();
@@ -40,12 +47,15 @@ Deno.serve(async (req) => {
     description = `Velvet VIP ${plan.name}`;
     referenceId = plan.id;
   } else if (kind === 'creator_plan' && body.planId) {
-    const { data: plan } = await admin.from('creator_plans').select('id,name,price,is_active,creator_id').eq('id', body.planId).single();
+    const { data: plan } = await admin.from('creator_plans').select('id,name,price,is_active,creator_id,tier,billing_period,creator_share_percent').eq('id', body.planId).single();
     if (!plan?.is_active) return json(req,{ error: 'Plano do criador inválido.' }, 400);
     amount = Number(plan.price);
     description = `Assinatura ${plan.name}`;
     referenceId = plan.id;
     metadata.creator_id = plan.creator_id;
+    metadata.tier = plan.tier;
+    metadata.billing_period = plan.billing_period;
+    metadata.share_percent = Number(plan.creator_share_percent);
   } else if (kind === 'pay_per_view' && body.videoId) {
     const { data: video } = await admin.from('videos')
       .select('id,title,premium_price,is_premium,creator_id,is_removed,is_draft,moderation_status')
@@ -68,18 +78,26 @@ Deno.serve(async (req) => {
     metadata.creator_id=live.creator_id; metadata.live_id=live.id;
   } else if (kind === 'tip' && body.creatorId) {
     amount = Number(body.amount);
-    if (!Number.isFinite(amount) || amount < 1 || amount > 9999) return json(req,{ error: 'Valor de gorjeta inválido.' }, 400);
+    const {data:regional}=await admin.from('app_content_settings').select('tips_enabled,tip_presets').eq('id','global').maybeSingle();
+    const presets=Array.isArray(regional?.tip_presets?.BRL)?regional.tip_presets.BRL.map(Number):[5,10,20,50,100];
+    if (!regional?.tips_enabled || !Number.isFinite(amount) || !presets.includes(amount)) return json(req,{ error: 'Valor de gorjeta inválido.' }, 400);
     description = 'Gorjeta para criador Velvet VIP';
     referenceId = body.creatorId;
     metadata.message = String(body.message || '').slice(0, 500);
     metadata.creator_id = body.creatorId;
     if (body.liveId) metadata.live_id=body.liveId;
+  } else if(kind==='live_offer' && body.offerId){
+    const {data:offer}=await admin.from('live_offers').select('id,live_id,creator_id,title,amount,currency,status,max_orders,orders_count').eq('id',body.offerId).single();
+    if(!offer || offer.status!=='active' || offer.currency!=='BRL' || (offer.max_orders!==null && Number(offer.orders_count)>=Number(offer.max_orders))) return json(req,{error:'Pedido da live indisponível.'},409);
+    amount=Number(offer.amount);description=`Live: ${offer.title}`;referenceId=offer.id;
+    metadata.creator_id=offer.creator_id;metadata.live_id=offer.live_id;metadata.offer_id=offer.id;metadata.note=String(body.note||'').slice(0,500);
   } else {
     return json(req,{ error: 'Dados de checkout incompletos.' }, 400);
   }
 
+  if (!Number.isFinite(amount) || amount <= 0) return json(req,{error:'Valor inválido.'},400);
   const { data: session, error: sessionError } = await admin.from('checkout_sessions').insert({
-    user_id: user.id, kind, reference_id: referenceId, amount, metadata
+    user_id: user.id, kind, reference_id: referenceId, amount, currency:'BRL', metadata
   }).select('id').single();
   if (sessionError || !session) return json(req,{ error: 'Não foi possível criar a sessão.' }, 500);
 

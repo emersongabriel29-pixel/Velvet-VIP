@@ -1,33 +1,48 @@
 import React, { useState } from 'react';
-import { Search, Sparkles, TrendingUp, Play, Lock, Heart, Users } from 'lucide-react';
-import { Video } from '../../types';
-import { dbService } from '../../services/db';
+import { Search, Sparkles, TrendingUp, Play, Lock, Heart, Radio, CalendarClock, Package, TicketPercent } from 'lucide-react';
+import { Video, Creator, LivePreview } from '../../types';
+import { listCategories, loadExplore } from '../../services/accountData';
+import type { ProductTool } from '../product/ProductHub';
 
 interface ExplorePageProps {
   onSelectVideo: (videoId: string) => void;
   onSelectCreator: (creatorId: string) => void;
+  onOpenLive: (liveId: string) => void;
+  onOpenTool: (tool: ProductTool) => void;
 }
 
 export const ExplorePage: React.FC<ExplorePageProps> = ({
   onSelectVideo,
   onSelectCreator,
+  onOpenLive,
+  onOpenTool,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
-  const [categoriesList, setCategoriesList] = useState<string[]>(() => [
-    'Todos',
-    ...dbService.getCategories().map(c => c.name)
-  ]);
+  const [categoriesList, setCategoriesList] = useState<string[]>(['Todos']);
+  const [creators, setCreators] = useState<Creator[]>([]);
+  const [allVideos, setVideos] = useState<Video[]>([]);
+  const [lives, setLives] = useState<LivePreview[]>([]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
-    const unsub = dbService.subscribe(() => {
-      setCategoriesList(['Todos', ...dbService.getCategories().map(c => c.name)]);
-    });
-    return unsub;
+    let active = true;
+    Promise.all([listCategories(), loadExplore()]).then(([categories, result]) => {
+      if (!active) return;
+      setCategoriesList(['Todos', ...categories.map(c => c.name)]);
+      setCreators(result.creators); setVideos(result.videos); setLives(result.lives);
+    }).catch(() => { if (active) setError('Não foi possível carregar o catálogo. Tente novamente.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
-  const creators = dbService.getCreators();
-  const allVideos = dbService.getVideos('foryou');
+  const liveCreatorIds = new Set(lives.filter(live => live.status === 'live').map(live => live.creator_id));
+  const formatSchedule = (value?: string) => value
+    ? new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : 'Horário a confirmar';
+
+
 
   const filteredVideos = allVideos.filter((v) => {
     const matchesCat = selectedCategory === 'Todos' || v.category === selectedCategory;
@@ -35,7 +50,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
     if (!term) return matchesCat;
 
     const matchesTitle = v.title.toLowerCase().includes(term);
-    const matchesDesc = v.description.toLowerCase().includes(term);
+    const matchesDesc = (v.description || '').toLowerCase().includes(term);
     const matchesCreator = v.creator?.display_name.toLowerCase().includes(term) || v.creator?.handle.toLowerCase().includes(term);
     const matchesTags = v.hashtags?.some((t) => t.toLowerCase().includes(term));
 
@@ -44,6 +59,8 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
 
   return (
     <div className="min-h-screen bg-[#09090b] text-white pt-16 pb-20 max-w-5xl mx-auto px-4 sm:px-6">
+      {error && <p role="alert" className="mb-4 text-rose-400">{error}</p>}
+      {loading && <p role="status">Carregando catálogo…</p>}
       {/* Search Input Bar */}
       <div className="relative mb-6">
         <Search className="w-5 h-5 text-zinc-500 absolute left-4 top-1/2 -translate-y-1/2" />
@@ -51,10 +68,53 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
           type="text"
           placeholder="Buscar vídeos, criadores ou #hashtags..."
           value={searchTerm}
-          onChange={(e) => { setSearchTerm(e.target.value); if (e.target.value.trim().length >= 3) dbService.recordSearch(e.target.value); }}
+          onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-12 pr-4 py-3.5 bg-[#141419] border border-zinc-800 rounded-2xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-rose-500 transition-colors shadow-lg"
         />
       </div>
+
+      <section className="mb-6" aria-labelledby="explore-discovery-heading">
+        <h2 id="explore-discovery-heading" className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Descobrir</h2>
+        <div className="grid grid-cols-3 gap-2">
+          <button type="button" onClick={()=>onOpenTool('premieres')} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 text-left hover:border-rose-500/40"><Radio className="mb-2 h-4 w-4 text-rose-400"/><span className="text-xs font-bold">Estreias</span></button>
+          <button type="button" onClick={()=>onOpenTool('bundles')} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 text-left hover:border-rose-500/40"><Package className="mb-2 h-4 w-4 text-rose-400"/><span className="text-xs font-bold">Pacotes</span></button>
+          <button type="button" onClick={()=>onOpenTool('coupons')} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 text-left hover:border-rose-500/40"><TicketPercent className="mb-2 h-4 w-4 text-rose-400"/><span className="text-xs font-bold">Cupons</span></button>
+        </div>
+      </section>
+
+      {/* Live and scheduled sessions */}
+      {lives.length > 0 && <section className="mb-8" aria-labelledby="explore-live-heading">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 id="explore-live-heading" className="flex items-center gap-2 text-sm font-bold text-white font-display">
+            <Radio className="h-4 w-4 text-rose-500" /> Lives em destaque
+          </h3>
+          <span className="text-[11px] text-zinc-400">{lives.filter(live => live.status === 'live').length} ao vivo</span>
+        </div>
+        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+          {lives.map(live => <button
+            key={live.id}
+            type="button"
+            data-explore-live-id={live.id}
+            onClick={() => onOpenLive(live.id)}
+            className={`group w-64 shrink-0 overflow-hidden rounded-2xl border text-left transition ${live.status === 'live' ? 'border-rose-500/40 bg-gradient-to-br from-rose-950/80 to-zinc-950 hover:border-rose-400' : 'border-zinc-800 bg-zinc-900/70 hover:border-amber-500/50'}`}
+          >
+            <div className="flex items-center gap-3 p-4">
+              <div className="relative h-14 w-14 shrink-0 rounded-full border-2 border-zinc-800 bg-zinc-950 p-0.5">
+                {live.creator?.avatar_url ? <img src={live.creator.avatar_url} alt="" className="h-full w-full rounded-full object-cover" referrerPolicy="no-referrer" /> : <Radio className="m-3.5 h-5 w-5 text-rose-400" />}
+                {live.status === 'live' && <span className="absolute inset-0 rounded-full ring-2 ring-rose-500/70 animate-pulse" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-black ${live.status === 'live' ? 'bg-rose-600 text-white' : 'bg-amber-500/15 text-amber-300'}`}>
+                  {live.status === 'live' ? <><span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> AO VIVO</> : <><CalendarClock className="h-3 w-3" /> AGENDADA</>}
+                </span>
+                <p className="mt-1.5 truncate text-sm font-bold text-white">{live.title}</p>
+                <p className="truncate text-[11px] text-zinc-400">{live.creator?.display_name || 'Criador verificado'}</p>
+                <p className="mt-1 text-[10px] text-zinc-500">{live.status === 'live' ? 'Abrir transmissão' : formatSchedule(live.scheduled_at)}</p>
+              </div>
+            </div>
+          </button>)}
+        </div>
+      </section>}
 
       {/* Trending Creators Carousel */}
       <div className="mb-8">
@@ -63,7 +123,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
             <TrendingUp className="w-4 h-4 text-rose-500" />
             <span>Criadores em Destaque</span>
           </h3>
-          <span className="text-[11px] text-zinc-400">Verificados 18+</span>
+          <span className="text-[11px] text-zinc-400">Perfis aprovados</span>
         </div>
 
         <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-2">
@@ -73,7 +133,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
               onClick={() => onSelectCreator(c.id)}
               className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer group w-20"
             >
-              <div className="relative w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-400 group-hover:scale-105 transition-transform shadow-md">
+              <div className={`relative w-16 h-16 rounded-full p-0.5 bg-gradient-to-tr from-rose-600 via-rose-500 to-amber-400 group-hover:scale-105 transition-transform shadow-md ${liveCreatorIds.has(c.id) ? 'ring-2 ring-rose-500 ring-offset-2 ring-offset-[#09090b] animate-pulse' : ''}`}>
                 <img
                   src={c.avatar_url}
                   alt={c.display_name}
@@ -81,6 +141,7 @@ export const ExplorePage: React.FC<ExplorePageProps> = ({
                   referrerPolicy="no-referrer"
                 />
                 <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400 absolute -top-1 -right-1" />
+                {liveCreatorIds.has(c.id) && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded bg-rose-600 px-1.5 py-0.5 text-[8px] font-black text-white">LIVE</span>}
               </div>
               <span className="text-xs font-semibold text-zinc-200 text-center truncate w-full group-hover:text-white">
                 {c.display_name}

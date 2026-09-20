@@ -25,7 +25,7 @@ import { Creator, Video } from '../../types';
 import { dbService } from '../../services/db';
 import { useAuth } from '../../hooks/useAuth';
 import { SubscribeModal } from '../creator/SubscribeModal';
-import { isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { isDemoMode, isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { uploadProfileImage, getProfileImageUrl } from '../../services/media';
 
 interface ProfileViewProps {
@@ -37,7 +37,7 @@ interface ProfileViewProps {
   onOpenUpload: () => void;
   onOpenLgpd?: () => void;
   onOpenAuth?: () => void;
-  onOpenLive?: () => void;
+  onOpenLive?: (liveId?: string) => void;
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
@@ -105,10 +105,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               if(!cancelled) setVideos(resolved as Video[]);
             }else if(!cancelled) setVideos([]);
           }else if(!cancelled) setVideos([]);
-        }else{
+        }else if(isDemoMode){
           targetCreator=creatorId?dbService.getCreatorById(creatorId):(currentCreator||undefined);
           if(targetCreator){setVideos(dbService.getVideosByCreator(targetCreator.id));setIsFollowing(dbService.isFollowing(targetCreator.id));}
           else setVideos(dbService.getFavorites());
+        }else{
+          throw new Error('Supabase não configurado.');
         }
         if(!cancelled){
           setCreator(targetCreator);
@@ -124,9 +126,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
   const handleToggleFollow = async () => {
     if (!creator || !isAuthenticated) return;
-    if(!isSupabaseConfigured || !supabase){
+    if(isDemoMode){
       const nowF=dbService.toggleFollow(creator.id); setIsFollowing(nowF); setCreator(dbService.getCreatorById(creator.id)); return;
     }
+    if(!supabase)return;
     if(isFollowing){
       const {error}=await supabase.from('follows').delete().eq('follower_id',currentUser.id).eq('creator_id',creator.id);
       if(!error){setIsFollowing(false);setCreator(prev=>prev?{...prev,total_followers:Math.max(0,(prev.total_followers||0)-1)}:prev);}
@@ -156,7 +159,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setSavingProfile(true); setProfileError('');
     try {
       let avatarRef=currentUser.avatar_url;
-      if(avatarFile) avatarRef=isSupabaseConfigured ? await uploadProfileImage(avatarFile,'avatar') : avatarPreview;
+      if(avatarFile) avatarRef=isDemoMode ? avatarPreview : await uploadProfileImage(avatarFile,'avatar');
       await updateProfile({ name:nameInput, bio:bioInput, avatar_url:avatarRef });
       if(creator && isSupabaseConfigured && supabase){
         let coverRef=creator.cover_url || '';
@@ -164,7 +167,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         const {error}=await supabase.from('creators').update({display_name:nameInput,bio:bioInput,avatar_url:avatarRef,cover_url:coverRef}).eq('id',creator.id);
         if(error) throw error;
         setCreator(prev=>prev?{...prev,display_name:nameInput,bio:bioInput,avatar_url:avatarRef,cover_url:coverRef}:prev);
-      } else if(creator) {
+      } else if(creator && isDemoMode) {
         dbService.updateCreator(creator.id,{display_name:nameInput,bio:bioInput,avatar_url:avatarRef,cover_url:coverPreview || creator.cover_url});
       }
       setAvatarFile(null); setCoverFile(null); setIsEditingBio(false);
@@ -220,17 +223,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   return (
     <div className="min-h-screen bg-[#09090b] text-white pt-14 pb-20 max-w-4xl mx-auto px-3 sm:px-6"><div className="mb-4 rounded-2xl border border-rose-500/20 bg-rose-950/10 px-4 py-3"><p className="text-sm font-black text-white">{pageTitle}</p><p className="mt-1 text-xs text-zinc-400">{pageSubtitle}</p></div>
       {/* Cover Banner */}
-      <div className="relative h-44 sm:h-56 rounded-3xl overflow-hidden bg-gradient-to-r from-rose-950/60 via-zinc-900 to-amber-950/40 border border-zinc-800 shadow-xl mb-16">
+      <div className="relative h-44 sm:h-56 rounded-3xl bg-gradient-to-r from-rose-950/60 via-zinc-900 to-amber-950/40 border border-zinc-800 shadow-xl mb-12">
         {coverPreview && (
           <img
             src={coverPreview}
             alt="Cover"
-            className="w-full h-full object-cover opacity-60"
+            className="w-full h-full rounded-3xl object-cover opacity-60"
             referrerPolicy="no-referrer"
           />
         )}
         {!coverPreview && <div className="absolute inset-0 flex items-center justify-center"><div className="text-center"><div className="text-2xl sm:text-3xl font-black">VELVET <span className="text-rose-500">VIP</span></div><div className="mt-1 text-[10px] font-bold uppercase tracking-[.3em] text-zinc-500">Conteúdo exclusivo 18+</div></div></div>}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#09090b] via-transparent to-transparent" />
+        <div className="absolute inset-0 rounded-3xl bg-gradient-to-t from-[#09090b] via-transparent to-transparent" />
 
         {/* Action button on top right of cover */}
         <div className="absolute top-4 right-4 flex items-center gap-2">
@@ -254,15 +257,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
 
         {/* Floating Avatar */}
-        <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 flex items-end gap-4">
+        <div className="absolute -bottom-8 left-5 sm:left-8 flex items-end gap-4">
           <div className="relative">
             <img
               src={avatarPreview || creator?.avatar_url || currentUser.avatar_url || 'https://placehold.co/256x256?text=Foto'}
               alt="Avatar"
-              className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-4 shadow-2xl bg-zinc-800 ${profileLives.some(l => l.status === "live") ? "border-rose-500 ring-4 ring-rose-500/25" : "border-[#09090b]"}`}
+              className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full object-contain object-center border-4 shadow-2xl bg-zinc-900 ${profileLives.some(l => l.status === "live") ? "border-rose-500 ring-4 ring-rose-500/25" : "border-[#09090b]"}`}
               referrerPolicy="no-referrer"
             />
-            {profileLives.some(l => l.status === "live") && <button type="button" onClick={onOpenLive} className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-rose-600 px-3 py-1 text-[10px] font-black text-white shadow-lg">AO VIVO</button>}
+            {profileLives.some(l => l.status === "live") && <button type="button" onClick={()=>onOpenLive?.(profileLives.find(l=>l.status==='live')?.id)} className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-rose-600 px-3 py-1 text-[10px] font-black text-white shadow-lg">AO VIVO</button>}
             {creator?.verified && (
               <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-xl bg-gradient-to-tr from-rose-600 to-amber-500 border-2 border-[#09090b] flex items-center justify-center text-white shadow">
                 <Crown className="w-4 h-4 fill-white" />
@@ -306,7 +309,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   className="px-3.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <ShoppingBag className="w-4 h-4 text-amber-400" />
-                  <span>Minhas Compras</span>
+                  <span>Biblioteca e Compras</span>
                 </button>
 
                 <button
@@ -428,7 +431,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       </div>
 
-      {creator && (profileLives.length > 0 || profileHighlights.length > 0) && <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="font-bold flex items-center gap-2"><Radio className="w-4 h-4 text-rose-500"/>Lives e destaques</h2>{profileLives.length>0&&onOpenLive&&<button onClick={onOpenLive} className="text-xs text-rose-400">Ver lives</button>}</div><div className="flex gap-4 overflow-x-auto pb-2">{profileLives.map(l=><button key={l.id} onClick={onOpenLive} className="w-24 shrink-0 text-center"><div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border-2 ${l.status==='live'?'border-rose-500 bg-rose-950/30':'border-amber-500 bg-zinc-900'}`}><Radio className={`h-7 w-7 ${l.status==='live'?'text-rose-400':'text-amber-300'}`}/></div><p className="mt-2 truncate text-xs font-bold">{l.status==='live'?'AO VIVO':l.title}</p></button>)}{profileHighlights.map(h=><button key={h.id} onClick={()=>setSelectedHighlight(h)} className="w-24 shrink-0 text-center"><div className="mx-auto h-20 w-20 overflow-hidden rounded-full border-2 border-zinc-700 bg-zinc-900">{h.display_url&&<img src={h.display_url} alt={h.title} className="h-full w-full object-cover"/>}</div><p className="mt-2 truncate text-xs font-bold">{h.title}</p></button>)}</div></section>}
+      {creator && (profileLives.length > 0 || profileHighlights.length > 0) && <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="font-bold flex items-center gap-2"><Radio className="w-4 h-4 text-rose-500"/>Lives e destaques</h2>{profileLives.length>0&&onOpenLive&&<button onClick={()=>onOpenLive(profileLives[0]?.id)} className="text-xs text-rose-400">Ver lives</button>}</div><div className="flex gap-4 overflow-x-auto pb-2">{profileLives.map(l=><button key={l.id} onClick={()=>onOpenLive?.(l.id)} className="w-24 shrink-0 text-center"><div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border-2 ${l.status==='live'?'border-rose-500 bg-rose-950/30 animate-pulse':'border-amber-500 bg-zinc-900'}`}><Radio className={`h-7 w-7 ${l.status==='live'?'text-rose-400':'text-amber-300'}`}/></div><p className="mt-2 truncate text-xs font-bold">{l.status==='live'?'AO VIVO':l.title}</p></button>)}{profileHighlights.map(h=><button key={h.id} onClick={()=>setSelectedHighlight(h)} className="w-24 shrink-0 text-center"><div className="mx-auto h-20 w-20 overflow-hidden rounded-full border-2 border-zinc-700 bg-zinc-900">{h.display_url&&<img src={h.display_url} alt={h.title} className="h-full w-full object-cover"/>}</div><p className="mt-2 truncate text-xs font-bold">{h.title}</p></button>)}</div></section>}
 
       {selectedHighlight&&<div onClick={()=>setSelectedHighlight(null)} className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"><div onClick={e=>e.stopPropagation()} className="w-full max-w-lg overflow-hidden rounded-3xl border border-zinc-800 bg-[#111116] shadow-2xl">{selectedHighlight.media_type==='video'?<video src={selectedHighlight.display_url} controls autoPlay playsInline className="max-h-[70vh] w-full bg-black object-contain"/>:<img src={selectedHighlight.display_url} alt={selectedHighlight.title} className="max-h-[70vh] w-full bg-black object-contain"/>}<div className="flex items-center justify-between gap-3 p-4"><div><p className="text-[10px] font-bold uppercase tracking-[.2em] text-rose-400">Destaque</p><h3 className="font-bold">{selectedHighlight.title}</h3></div><button onClick={()=>setSelectedHighlight(null)} className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold">Fechar</button></div></div></div>}
 

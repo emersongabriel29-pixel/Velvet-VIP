@@ -1,0 +1,19 @@
+project_id = "velvet-vip"
+
+[functions.get-video-url]
+# Public/free branch and authenticated restricted branch are enforced in the handler.
+verify_jwt = false
+[functions.get-hls-playlist]
+# Short-lived HMAC playback tokens are issued only after get-video-url authorizes access.
+verify_jwt = false
+[functions.create-checkout]
+verify_jwt = true
+[functions.payment-webhook]
+# Mercado Pago HMAC + authoritative server-side payment lookup.
+verify_jwt = false
+[functions.get-live-playback]
+verify_jwt = true
+[functions.create-payment-preference]
+verify_jwt = true
+[functions.mercadopago-webhook]
+verify_jwt = false

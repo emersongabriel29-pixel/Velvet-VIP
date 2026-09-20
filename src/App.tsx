@@ -10,7 +10,6 @@ import { NotificationsPage } from './components/activity/NotificationsPage';
 import { ProfileView } from './components/profile/ProfileView';
 import { CreatorDashboard } from './components/creator/CreatorDashboard';
 import { MyPurchasesPage } from './components/purchases/MyPurchasesPage';
-import { AdminPanel } from './components/admin/AdminPanel';
 import { AdminCommandCenter } from './components/admin/AdminCommandCenter';
 import { LandingPage } from './components/landing/LandingPage';
 import { UploadModal } from './components/creator/UploadModal';
@@ -25,9 +24,11 @@ import { CreateHub } from './components/creator/CreateHub';
 import { LiveStudio } from './components/live/LiveStudio';
 import { ProductHub, ProductTool } from './components/product/ProductHub';
 import { ProductToolPage } from './components/product/ProductToolPage';
+import { LocaleProvider } from './hooks/useLocale';
 
 const VelvetVipApp: React.FC = () => {
   const { hasConsented18Plus } = useAuth();
+  const [selectedVideoId, setSelectedVideoId] = useState<string | undefined>();
   const [activeView, setActiveView] = useState<string>('feed');
   const [currentTab, setCurrentTab] = useState<FeedTab>('foryou');
   const [selectedCreatorId, setSelectedCreatorId] = useState<string | undefined>(undefined);
@@ -39,12 +40,15 @@ const VelvetVipApp: React.FC = () => {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [lgpdModalOpen, setLgpdModalOpen] = useState(false);
   const [productTool, setProductTool] = useState<ProductTool>('search');
+  const [productToolBackView,setProductToolBackView]=useState('more');
   const [initialLiveId, setInitialLiveId] = useState<string | undefined>(undefined);
 
   useEffect(()=>{
     const syncHash=()=>{
       const match=window.location.hash.match(/^#creator=([0-9a-f-]{36})$/i);
       if(match){setSelectedCreatorId(match[1]);setActiveView('profile');}
+      const liveMatch=window.location.hash.match(/^#live=([0-9a-f-]{36})$/i);
+      if(liveMatch){setInitialLiveId(liveMatch[1]);setActiveView('live');}
     };
     syncHash();
     window.addEventListener('hashchange',syncHash);
@@ -53,25 +57,28 @@ const VelvetVipApp: React.FC = () => {
 
   useEffect(()=>{ const handler=(event:Event)=>{ const id=(event as CustomEvent<string>).detail; setInitialLiveId(id); setActiveView('live'); }; window.addEventListener('velvet:open-live',handler); return()=>window.removeEventListener('velvet:open-live',handler); },[]);
   const handleSelectCreator = (creatorId: string) => { setSelectedCreatorId(creatorId); window.history.replaceState(null,'',`#creator=${creatorId}`); setActiveView('profile'); };
-  const handleSelectVideo = (_videoId: string) => { setActiveView('feed'); };
+  const handleSelectVideo = (videoId: string) => { setSelectedVideoId(videoId); setCurrentTab('foryou'); setActiveView('feed'); };
   const handleOpenProfile = () => { setSelectedCreatorId(undefined); if(window.location.hash.startsWith('#creator=')) window.history.replaceState(null,'',window.location.pathname+window.location.search); setActiveView('profile'); };
+  const handleOpenLive = (liveId?: string) => { setInitialLiveId(liveId); if(liveId) window.history.replaceState(null,'',`#live=${liveId}`); setActiveView('live'); };
+  const handleOpenProductTool=(tool:ProductTool,backView:string)=>{setProductTool(tool);setProductToolBackView(backView);setActiveView('product_tool');};
+  const handleNavigate=(view:string)=>view==='profile'?handleOpenProfile():setActiveView(view);
 
   return <div id="velvet-vip-root" className="min-h-screen overflow-x-hidden bg-[#09090b] font-sans text-zinc-100 selection:bg-rose-500 selection:text-white">
     <AgeVerificationModal />
     <Header currentTab={currentTab} onTabChange={(tab) => { setCurrentTab(tab); setActiveView('feed'); }} activeView={activeView} onViewChange={(view) => view === 'profile' ? handleOpenProfile() : setActiveView(view)} onOpenSupabaseModal={() => setSupabaseModalOpen(true)} onOpenWalletModal={() => setWalletModalOpen(true)} onOpenLanding={() => setActiveView('landing')} onOpenAuthModal={() => setAuthModalOpen(true)} onOpenLgpdModal={() => setLgpdModalOpen(true)} />
     <main className="w-full">
-      {activeView === 'feed' && <VideoFeed currentTab={currentTab} onSelectCreator={handleSelectCreator} onOpenUpload={() => setCreateHubOpen(true)} />}
-      {activeView === 'explore' && <ExplorePage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} />}
-      {activeView === 'activity' && <NotificationsPage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} />}
-      {activeView === 'profile' && <ProfileView creatorId={selectedCreatorId} onSelectVideo={handleSelectVideo} onOpenCreatorStudio={() => setActiveView('creator_studio')} onOpenMyPurchases={() => setActiveView('purchases')} onOpenWallet={() => setWalletModalOpen(true)} onOpenUpload={() => setCreateHubOpen(true)} onOpenLgpd={() => setLgpdModalOpen(true)} onOpenAuth={() => setAuthModalOpen(true)} onOpenLive={() => setActiveView('live')} />}
-      {activeView === 'creator_studio' && <CreatorDashboard onOpenUpload={() => setCreateHubOpen(true)} onSelectVideo={handleSelectVideo} />}
-      {activeView === 'purchases' && <MyPurchasesPage onSelectVideo={handleSelectVideo} onBack={() => setActiveView('profile')} />}
+      {activeView === 'feed' && <VideoFeed selectedVideoId={selectedVideoId} currentTab={currentTab} onSelectCreator={handleSelectCreator} onOpenUpload={() => setCreateHubOpen(true)} />}
+      {activeView === 'explore' && <ExplorePage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} onOpenLive={handleOpenLive} onOpenTool={tool=>handleOpenProductTool(tool,'explore')} />}
+      {activeView === 'activity' && <NotificationsPage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} onOpenMessages={()=>handleOpenProductTool('messages','activity')} />}
+      {activeView === 'profile' && <ProfileView creatorId={selectedCreatorId} onSelectVideo={handleSelectVideo} onOpenCreatorStudio={() => setActiveView('creator_studio')} onOpenMyPurchases={() => setActiveView('purchases')} onOpenWallet={() => setWalletModalOpen(true)} onOpenUpload={() => setCreateHubOpen(true)} onOpenLgpd={() => setLgpdModalOpen(true)} onOpenAuth={() => setAuthModalOpen(true)} onOpenLive={handleOpenLive} />}
+      {activeView === 'creator_studio' && <CreatorDashboard onOpenUpload={() => setCreateHubOpen(true)} onSelectVideo={handleSelectVideo} onOpenTool={tool=>handleOpenProductTool(tool,'creator_studio')} />}
+      {activeView === 'purchases' && <MyPurchasesPage onSelectVideo={handleSelectVideo} onBack={() => setActiveView('profile')} onOpenTool={tool=>handleOpenProductTool(tool,'purchases')} />}
       {activeView === 'admin' && <AdminCommandCenter onSelectVideo={handleSelectVideo} />}
-      {activeView === 'live' && <LivePage initialLiveId={initialLiveId} onBack={() => { setInitialLiveId(undefined); setActiveView('feed'); }} />}
+      {activeView === 'live' && <LivePage initialLiveId={initialLiveId} onBack={() => { setInitialLiveId(undefined); if(window.location.hash.startsWith('#live='))window.history.replaceState(null,'',window.location.pathname+window.location.search); setActiveView('feed'); }} />}
       {activeView === 'live_studio' && <LiveStudio onBack={() => setActiveView('creator_studio')} onOpenLives={() => setActiveView('live')} />}
       {activeView === 'community' && <CommunityPage onBack={() => setActiveView('feed')} />}
-      {activeView === 'more' && <ProductHub onOpen={(tool) => { setProductTool(tool); setActiveView('product_tool'); }} />}
-      {activeView === 'product_tool' && <ProductToolPage tool={productTool} onBack={() => setActiveView('more')} />}
+      {activeView === 'more' && <ProductHub onOpen={tool=>handleOpenProductTool(tool,'more')} onNavigate={handleNavigate} onOpenLgpd={()=>setLgpdModalOpen(true)} onOpenAuth={()=>setAuthModalOpen(true)} />}
+      {activeView === 'product_tool' && <ProductToolPage onSelectVideo={handleSelectVideo} onSelectCreator={handleSelectCreator} tool={productTool} onBack={() => setActiveView(productToolBackView)} />}
       {activeView === 'monetization' && <MonetizationPage onBack={() => setActiveView('feed')} />}
       {activeView === 'landing' && <LandingPage onEnterApp={() => setActiveView('feed')} onOpenUpload={() => setCreateHubOpen(true)} />}
     </main>
@@ -85,4 +92,4 @@ const VelvetVipApp: React.FC = () => {
   </div>;
 };
 
-export default function App() { return <AuthProvider><VelvetVipApp /></AuthProvider>; }
+export default function App() { return <LocaleProvider><AuthProvider><VelvetVipApp /></AuthProvider></LocaleProvider>; }

@@ -10,43 +10,55 @@ import {
   CheckCheck
 } from 'lucide-react';
 import { Notification } from '../../types';
-import { dbService } from '../../services/db';
+import { loadNotifications as fetchNotifications, markNotificationsRead } from '../../services/accountData';
 import { useAuth } from '../../hooks/useAuth';
 
 interface NotificationsPageProps {
   onSelectVideo?: (videoId: string) => void;
   onSelectCreator?: (creatorId: string) => void;
+  onOpenMessages?: () => void;
 }
 
 export const NotificationsPage: React.FC<NotificationsPageProps> = ({
   onSelectVideo,
   onSelectCreator,
+  onOpenMessages,
 }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
+  const [error, setError] = useState('');
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
 
-  const loadNotifications = () => {
-    setNotifications(isAuthenticated ? dbService.getNotifications() : dbService.getVisitorNotifications());
+  const loadNotifications = async () => {
+    if (!isAuthenticated) { setNotifications([]); return; }
+    try { setNotifications(await fetchNotifications()); setError(''); }
+    catch { setError('Não foi possível carregar suas notificações.'); }
   };
 
   useEffect(() => {
-    loadNotifications();
-    const refresh = () => loadNotifications();
+    let active = true;
+    setNotifications([]);
+    const refresh = () => {
+      if (!isAuthenticated) return;
+      fetchNotifications().then(rows => { if (active) { setNotifications(rows); setError(''); } })
+        .catch(() => { if (active) setError('Não foi possível carregar suas notificações.'); });
+    };
+    refresh();
     const timer = window.setInterval(refresh, 15000);
     window.addEventListener('focus', refresh);
     window.addEventListener('storage', refresh);
     return () => {
+      active = false;
       window.clearInterval(timer);
       window.removeEventListener('focus', refresh);
       window.removeEventListener('storage', refresh);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, currentUser.id]);
 
-  const handleMarkAllRead = () => {
-    if (isAuthenticated) dbService.markAllNotificationsAsRead();
-    else dbService.markVisitorNotificationsAsRead();
-    loadNotifications();
+  const handleMarkAllRead = async () => {
+    if (!isAuthenticated) return;
+    try { await markNotificationsRead(); await loadNotifications(); }
+    catch { setError('Não foi possível marcar as notificações como lidas.'); }
   };
 
   const filtered = notifications;
@@ -75,6 +87,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
 
   return (
     <div className="min-h-screen bg-[#09090b] text-white pt-16 pb-20 max-w-2xl mx-auto px-4 sm:px-6">
+      {error && <p role="alert" className="mb-3 text-rose-400">{error}</p>}
       {/* Header */}
       <div className="flex items-start justify-between gap-3 pb-3 border-b border-zinc-800 mb-3">
         <div>
@@ -82,22 +95,17 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
           <p className="text-xs text-zinc-400">{isAuthenticated ? 'Todas as novidades e atividades da sua conta aparecem aqui em uma única lista.' : 'Descubra conteúdos novos e criadores que você poderá seguir ao criar sua conta.'}</p>
         </div>
 
-        <button
-          onClick={handleMarkAllRead}
-          className="shrink-0 px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-        >
-          <CheckCheck className="w-3.5 h-3.5 text-zinc-400" />
-          <span className="hidden sm:inline">Marcar todas como lidas</span><span className="sm:hidden">Ler todas</span>
-        </button>
+        <div className="flex shrink-0 gap-2">
+          {isAuthenticated&&onOpenMessages&&<button onClick={onOpenMessages} className="flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-950/30 px-2.5 py-1.5 text-xs font-bold text-rose-300"><MessageSquare className="h-3.5 w-3.5"/><span>Mensagens</span></button>}
+          <button onClick={handleMarkAllRead} className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white">
+            <CheckCheck className="h-3.5 w-3.5 text-zinc-400"/><span className="hidden sm:inline">Marcar como lidas</span><span className="sm:hidden">Ler</span>
+          </button>
+        </div>
       </div>
 
       {/* Unified notification stream: no choice between content/creators. */}
       {/* Notifications List */}
-      {!isAuthenticated && (
-        <div className="mb-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 text-xs text-zinc-400">
-          Você pode acompanhar novidades públicas sem criar conta. Entre para receber também interações, assinaturas, compras e outras notificações da sua conta.
-        </div>
-      )}
+      {!isAuthenticated && <p className="mb-4 text-sm text-zinc-400">Faça login para acompanhar as interações da sua conta.</p>}
       <div className="space-y-2">
         {filtered.length === 0 ? (
           <div className="py-16 text-center text-zinc-500">

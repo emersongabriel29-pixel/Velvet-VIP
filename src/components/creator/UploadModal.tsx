@@ -1,8 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, Film, CheckCircle2, Sparkles, Image, Lock, Globe, Users } from 'lucide-react';
 import { dbService } from '../../services/db';
-import { isSupabaseConfigured } from '../../lib/supabase';
+import { isSupabaseConfigured, isDemoMode } from '../../lib/supabase';
 import { uploadCreatorVideo } from '../../services/media';
+import { listCategories } from '../../services/accountData';
+import type { SystemCategory } from '../../types';
 
 interface UploadModalProps {
   mode?: 'short' | 'long';
@@ -39,8 +41,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
   const [thumbnailUrl, setThumbnailUrl] = useState(SAMPLE_PRESET_VIDEOS[0].thumb);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const systemCategories = dbService.getCategories();
-  const [category, setCategory] = useState(systemCategories[0]?.name || 'Glamour & Lifestyle');
+  const [systemCategories, setSystemCategories] = useState<SystemCategory[]>([]);
+  const [category, setCategory] = useState('');
+  React.useEffect(() => {
+    let active = true;
+    listCategories().then(rows => { if (active) { setSystemCategories(rows); setCategory(value => value || rows[0]?.name || ''); } }).catch(() => { if (active) setUploadError('Não foi possível carregar as categorias.'); });
+    return () => { active = false; };
+  }, []);
   const [hashtagsStr, setHashtagsStr] = useState('velvetvip, bastidores, exclusivo');
   const [accessType, setAccessType] = useState<'public' | 'followers' | 'premium'>('public');
   const [premiumPrice, setPremiumPrice] = useState(19.90);
@@ -112,7 +119,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
     setUploadProgress(10);
     const tags = hashtagsStr.split(/[,\s#]+/).map(t=>t.trim().toLowerCase()).filter(Boolean);
     try {
-      if (isSupabaseConfigured) {
+      if (!isDemoMode) {
+        if (!isSupabaseConfigured) throw new Error('Supabase não configurado.');
         if (!selectedFile) throw new Error('Selecione um arquivo do dispositivo para publicar em produção.');
         setUploadProgress(30);
         await uploadCreatorVideo({
@@ -168,7 +176,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ mode = 'short', isOpen
               {isDraft ? 'Salvo como Rascunho!' : 'Vídeo Publicado com Sucesso!'}
             </h4>
             <p className="text-xs text-zinc-400">
-              {mode === 'long' ? 'Seu vídeo longo foi publicado e ficará disponível no perfil do criador.' : 'Seu conteúdo já está processado e disponível no feed dos seus seguidores e assinantes.'}
+              {isDemoMode ? 'Conteúdo salvo na demonstração local.' : 'Upload recebido. O conteúdo será liberado após processamento e moderação.'}
             </p>
           </div>
         ) : isUploading ? (

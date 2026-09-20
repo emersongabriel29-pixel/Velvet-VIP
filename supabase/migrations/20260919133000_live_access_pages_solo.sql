@@ -37,9 +37,12 @@ create table if not exists public.live_solo_requests (
 );
 alter table public.live_solo_requests enable row level security;
 create policy "Membro vê suas lives solo" on public.live_solo_requests
-  for select using (auth.uid() = requester_id or auth.uid() in (select user_id from public.creators where id=creator_id) or public.is_admin());
-create policy "Criador vê suas lives solo" on public.live_solo_requests
-  for update using (auth.uid() in (select user_id from public.creators where id=creator_id) or public.is_admin());
+  for select to authenticated using ((select auth.uid()) = requester_id or (select auth.uid()) in (select user_id from public.creators where id=creator_id) or public.is_admin());
+create policy "Criador atualiza suas lives solo" on public.live_solo_requests
+  for update to authenticated
+  using ((select auth.uid()) in (select user_id from public.creators where id=creator_id) or public.is_admin())
+  with check ((select auth.uid()) in (select user_id from public.creators where id=creator_id) or public.is_admin());
+grant select,update on public.live_solo_requests to authenticated;
 create index if not exists live_solo_requests_creator_status_idx on public.live_solo_requests(creator_id,status,created_at desc);
 create index if not exists live_solo_requests_requester_idx on public.live_solo_requests(requester_id,created_at desc);
 

@@ -13,14 +13,16 @@ import {
   Crown,
   Sparkles,
   Maximize2,
-  Settings
+  Settings,
+  DollarSign
 } from 'lucide-react';
 import { Video } from '../../types';
 import { dbService } from '../../services/db';
 import { getVideoPlaybackOptions, PlaybackSource } from '../../services/media';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured, isDemoMode } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 import { AdaptiveVideo } from '../common/AdaptiveVideo';
+import { useLocale } from '../../hooks/useLocale';
 
 interface VideoCardProps {
   video: Video;
@@ -48,6 +50,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   onTagClick,
 }) => {
   const { currentUser, isAuthenticated } = useAuth();
+  const {currency,formatMoney}=useLocale();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -62,6 +65,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [playbackSources,setPlaybackSources]=useState<PlaybackSource[]>([]);
   const [playbackUrl, setPlaybackUrl] = useState(video.video_url.startsWith('storage://') ? '' : video.video_url);
   const [playbackType,setPlaybackType]=useState('video/mp4');
+  const [showTips,setShowTips]=useState(false);
+  const [tipPresets,setTipPresets]=useState([5,10,20,50,100]);
   const lastTapRef = useRef<number>(0);
   const canPlayback = !video.is_premium || Boolean(video.has_unlocked);
   const isLocked = video.is_premium && !video.has_unlocked;
@@ -69,7 +74,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   useEffect(() => {
     let cancelled=false;
     (async()=>{
-      if(!isSupabaseConfigured || !supabase){
+      if(isDemoMode){
         if(!cancelled){
           setIsFollowing(video.creator_id?dbService.isFollowing(video.creator_id):false);
           setHasLiked(Boolean(video.has_liked));
@@ -115,6 +120,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     return ()=>{cancelled=true;};
   }, [video.id, video.video_url, canPlayback]);
 
+  useEffect(()=>{if(!supabase)return;supabase.from('app_content_settings').select('tip_presets').eq('id','global').maybeSingle().then(({data})=>{const values=data?.tip_presets?.[currency];if(Array.isArray(values))setTipPresets(values.map(Number).filter(Number.isFinite));});},[currency]);
+
   // Handle Play/Pause when card becomes active/inactive
   useEffect(() => {
     const el = videoRef.current;
@@ -132,7 +139,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       }
       if(isSupabaseConfigured && supabase){
         if(isAuthenticated) void supabase.rpc('record_video_view',{p_video_id:video.id,p_duration_seconds:0});
-      }else dbService.recordView(video.id);
+      }else if(isDemoMode) dbService.recordView(video.id);
     } else {
       el.pause();
       setIsPlaying(false);
@@ -187,9 +194,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   const handleLike = async () => {
-    if(!isSupabaseConfigured || !supabase){
+    if(isDemoMode){
       const res=dbService.toggleLike(video.id);setHasLiked(res.hasLiked);setLikesCount(res.count);return;
     }
+    if(!supabase)return;
     if(!isAuthenticated)return;
     const previous=hasLiked;
     setHasLiked(!previous);setLikesCount(v=>Math.max(0,v+(previous?-1:1)));
@@ -199,7 +207,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   };
 
   const handleFavorite = async () => {
-    if(!isSupabaseConfigured || !supabase){setHasFavorited(dbService.toggleFavorite(video.id));return;}
+    if(isDemoMode){setHasFavorited(dbService.toggleFavorite(video.id));return;}
+    if(!supabase)return;
     if(!isAuthenticated)return;
     const previous=hasFavorited;setHasFavorited(!previous);
     const {data,error}=await supabase.rpc('toggle_video_favorite',{p_video_id:video.id});
@@ -209,7 +218,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const handleToggleFollow = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!video.creator_id) return;
-    if(!isSupabaseConfigured || !supabase){setIsFollowing(dbService.toggleFollow(video.creator_id));return;}
+    if(isDemoMode){setIsFollowing(dbService.toggleFollow(video.creator_id));return;}
+    if(!supabase)return;
     if(!isAuthenticated)return;
     const previous=isFollowing;setIsFollowing(!previous);
     const {data,error}=await supabase.rpc('toggle_creator_follow',{p_creator_id:video.creator_id});
@@ -226,6 +236,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       }
     }
   };
+  const sendTip=async(amount:number)=>{if(!supabase||!isAuthenticated)return;const {data,error}=await supabase.functions.invoke('create-checkout',{body:{kind:'tip',creatorId:video.creator_id,amount,currency,message:`Gorjeta no vídeo ${video.title}`}});if(error||!data?.checkoutUrl){window.alert(data?.error||error?.message||'Não foi possível iniciar a gorjeta.');return;}window.location.href=data.checkoutUrl;};
 
   return (
     <div
@@ -250,6 +261,12 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             isLocked ? 'filter blur-2xl brightness-50 scale-105' : ''
           }`}
         />
+
+        {(video.content_kind === 'long' || video.duration_seconds >= 60) && video.watermark_enabled !== false && (
+          <div className="pointer-events-none absolute bottom-3 right-3 z-20 rounded-lg border border-white/15 bg-black/45 px-2.5 py-1 text-[10px] font-black tracking-[.16em] text-white/80 backdrop-blur-sm">
+            VELVET <span className="text-rose-400">VIP</span>
+          </div>
+        )}
 
         {(video.content_kind === 'long' || video.duration_seconds >= 60) && <div className="absolute top-16 sm:top-4 left-4 z-30 flex items-center gap-2"><div className="rounded-lg bg-black/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur-md">PRÉVIA • 15s • VÍDEO LONGO</div>{playbackSources.length>1&&<div className="relative"><button onClick={(e)=>{e.stopPropagation();setShowQuality(v=>!v)}} className="rounded-lg bg-black/60 p-1.5 text-white backdrop-blur-md" title="Qualidade"><Settings className="h-3.5 w-3.5"/></button>{showQuality&&<div onClick={e=>e.stopPropagation()} className="absolute left-0 mt-1 w-32 rounded-xl border border-white/10 bg-black/95 p-1 shadow-xl">{playbackSources.map(src=><button key={src.label} onClick={()=>{setQuality(src.label);setPlaybackUrl(src.url);setPlaybackType(src.type);setShowQuality(false)}} className={`block w-full rounded-lg px-2 py-1.5 text-left text-[10px] ${quality===src.label?'bg-rose-600 text-white':'text-zinc-300 hover:bg-white/10'}`}>{src.label}</button>)}</div>}</div>}</div>}
 
@@ -445,6 +462,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           </button>
 
           {/* More Options / Report */}
+          {(video.content_kind==='long'||video.duration_seconds>=60)&&<button onClick={()=>setShowTips(true)} className="flex flex-col items-center gap-1" title="Enviar gorjeta"><div className="flex h-11 w-11 items-center justify-center rounded-full bg-amber-500/20 text-amber-300 backdrop-blur-md"><DollarSign className="h-6 w-6"/></div><span className="text-[10px] font-bold">Gorjeta</span></button>}
+
           <button
             id={`more-opts-btn-${video.id}`}
             onClick={() => onOpenReport(video)}
@@ -454,6 +473,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             <MoreVertical className="w-5 h-5" />
           </button>
         </div>
+
+        {showTips&&<div onClick={e=>e.stopPropagation()} className="absolute inset-x-4 bottom-24 z-50 rounded-2xl border border-amber-500/30 bg-zinc-950/95 p-4 shadow-2xl backdrop-blur"><div className="flex items-center justify-between"><p className="text-sm font-bold text-amber-300">Gorjeta para {video.creator?.display_name||'criador'}</p><button onClick={()=>setShowTips(false)} className="text-zinc-400">×</button></div><div className="mt-3 flex flex-wrap gap-2">{tipPresets.map(value=><button key={value} onClick={()=>sendTip(value)} className="rounded-xl bg-amber-500/15 px-3 py-2 text-xs font-black text-amber-300">{formatMoney(value,currency)}</button>)}</div>{currency!=='BRL'&&<p className="mt-2 text-[10px] text-zinc-500">USD depende de um gateway regional configurado pelo administrador.</p>}</div>}
 
         {/* Bottom Information Overlay */}
         <div

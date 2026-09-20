@@ -9,6 +9,7 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,13 +20,24 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Typecheck
         run: npm run typecheck
 
       - name: Automated contract tests
         run: npm test
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+
+      - name: FFmpeg media integration
+        run: npm run test:media
+
+      - name: Build media worker image
+        run: docker build -f workers/media/Dockerfile -t velvet-media-worker:ci .
 
       - name: Production build
         run: npm run build

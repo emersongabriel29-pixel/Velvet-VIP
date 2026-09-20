@@ -26,8 +26,20 @@ test('legacy webhook requires HMAC freshness and amount integrity',()=>{
   assert.match(legacyWebhook,/MERCADOPAGO_WEBHOOK_SECRET/);
   assert.match(legacyWebhook,/Math\.abs\(now-tsSeconds\)>300/);
   assert.match(legacyWebhook,/transaction_amount/);
-  assert.match(legacyWebhook,/currency!==\s*'BRL'/);
+  const settlement=read('supabase/migrations/20260919162845_atomic_payment_settlement.sql');
+  assert.match(settlement,/currency_id.*distinct from 'BRL'/);
+  assert.match(settlement,/transaction_amount.*distinct from s.amount/);
 });
 test('production backend configuration fails closed',()=>{
   assert.match(supabaseClient,/productionBuild && !isSupabaseConfigured && !explicitDemoMode/);
+});
+test('local database consumers are explicitly restricted to demo mode',()=>{
+  const files=fs.readdirSync('src',{recursive:true}).filter(name=>/\.(ts|tsx)$/.test(name));
+  for(const name of files){
+    const path=`src/${name}`;
+    if(path==='src/services/db.ts')continue;
+    const source=read(path);
+    if(!source.includes('dbService.'))continue;
+    assert.match(source,/isDemoMode|demoMode/,`${path} uses dbService without an explicit demo guard`);
+  }
 });

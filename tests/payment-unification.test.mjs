@@ -20,12 +20,9 @@ test('canonical checkout validates PPV from server-side video data',()=>{
   assert.match(checkout,/moderation_status/);
 });
 
-test('canonical webhook settles and reverses PPV idempotently',()=>{
-  assert.match(webhook,/session\.kind === 'pay_per_view'/);
-  assert.match(webhook,/kind:'ppv'/);
-  assert.match(webhook,/reverse_creator_credit/);
-  assert.match(webhook,/financial_transactions/);
-  assert.match(webhook,/provider_reference/);
+test('canonical webhook delegates settlement to a single database transaction',()=>{
+  assert.match(webhook,/rpc\('settle_verified_payment'/);
+  assert.doesNotMatch(webhook,/from\('payment_events'\)\.insert/);
 });
 
 

@@ -15,7 +15,7 @@ import {
   SystemTag,
   SecurityAuditLog
 } from '../types';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, isDemoMode } from '../lib/supabase';
 
 const STORAGE_KEY_PREFIX = 'velvet_vip_db_v2_';
 
@@ -1612,4 +1612,12 @@ class DatabaseService {
 
 }
 
-export const dbService = new DatabaseService();
+let demoDatabase: DatabaseService | undefined;
+export const dbService = new Proxy({} as DatabaseService, {
+  get(_target, property) {
+    if (!isDemoMode) throw new Error('Dados de demonstração indisponíveis fora do modo demo.');
+    demoDatabase ??= new DatabaseService();
+    const value = Reflect.get(demoDatabase, property);
+    return typeof value === 'function' ? value.bind(demoDatabase) : value;
+  }
+});

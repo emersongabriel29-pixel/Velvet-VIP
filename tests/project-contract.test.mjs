@@ -13,7 +13,10 @@ test('content policy keeps explicit content paid', async () => {
 test('feed does not show ads to paid plans', async () => {
   const feed = await read('src/components/feed/VideoFeed.tsx');
   assert.match(feed, /platform_plan_slug/);
-  assert.match(feed, /=== 'gratis'/);
+  assert.match(feed, /from\('platform_plans'\)/);
+  assert.match(feed, /plan\.slug===planSlug/);
+  assert.match(feed, /planAds/);
+  assert.match(feed, /ads_enabled/);
   assert.doesNotMatch(feed, /const showAds = true/);
 });
 
