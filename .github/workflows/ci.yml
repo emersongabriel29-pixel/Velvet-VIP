@@ -28,6 +28,11 @@ jobs:
       - name: Automated contract tests
         run: npm test
 
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+
       - name: FFmpeg media integration
         run: npm run test:media
 
