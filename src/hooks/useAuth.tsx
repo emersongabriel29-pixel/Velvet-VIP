@@ -7,6 +7,9 @@ interface AuthContextType {
   currentUser: User;
   currentCreator?: Creator;
   isAuthenticated: boolean;
+  canUseTestMode: boolean;
+  isRolePreview: boolean;
+  testRole: UserRole | null;
   isAgeVerified: boolean;
   hasConsented18Plus: boolean;
   confirmAgeVerification: () => Promise<void>;
@@ -24,6 +27,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 const AGE_CONSENT_KEY = 'velvet_vip_age_consent_confirmed';
+const TEST_ROLE_KEY = 'velvet_vip_admin_test_role';
 
 const guestUser: User = {
   id: '', email: '', username: '', name: 'Visitante', avatar_url: '', bio: '', role: 'user',
@@ -54,6 +58,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentUser, setCurrentUser] = useState<User>(() => demoMode ? dbService.getCurrentUser() : guestUser);
   const [currentCreator, setCurrentCreator] = useState<Creator | undefined>(() => demoMode ? dbService.getCreatorByUserId(dbService.getCurrentUser().id) : undefined);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => demoMode);
+  const [testRole, setTestRole] = useState<UserRole | null>(() => {
+    if (demoMode) return null;
+    const stored = sessionStorage.getItem(TEST_ROLE_KEY);
+    return stored === 'user' || stored === 'creator' || stored === 'admin' ? stored : null;
+  });
   const [hasConsented18Plus, setHasConsented18Plus] = useState<boolean>(() => localStorage.getItem(AGE_CONSENT_KEY) === 'true');
   const [allUsers, setAllUsers] = useState<User[]>(() => demoMode ? dbService.getAllUsers() : []);
 
@@ -64,6 +73,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
     if (error || !data) return null;
     const mapped = mapProfile(data, email || '');
+    if (mapped.role !== 'admin') {
+      sessionStorage.removeItem(TEST_ROLE_KEY);
+      setTestRole(null);
+    }
     if (supabase && data.platform_plan_id) {
       const { data: plan } = await supabase.from('platform_plans').select('slug').eq('id', data.platform_plan_id).maybeSingle();
       if (plan?.slug === 'gratis' || plan?.slug === 'plus' || plan?.slug === 'vip') mapped.platform_plan_slug = plan.slug;
@@ -165,6 +178,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     if (demoMode) { dbService.setCurrentUser('user-002'); return; }
     if (supabase) await supabase.auth.signOut();
+    sessionStorage.removeItem(TEST_ROLE_KEY);
+    setTestRole(null);
     setCurrentUser(guestUser);
     setCurrentCreator(undefined);
     setIsAuthenticated(false);
@@ -174,7 +189,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (demoMode) {
       const match = allUsers.find(u => u.role === role);
       if (match) dbService.setCurrentUser(match.id);
+      return;
     }
+    // Production role switching is an admin-only UI preview. The authenticated
+    // account and its database permissions are deliberately never changed.
+    if (currentUser.role !== 'admin') return;
+    sessionStorage.setItem(TEST_ROLE_KEY, role);
+    setTestRole(role);
   };
 
   const switchUser = (userId: string) => { if (demoMode) dbService.setCurrentUser(userId); };
@@ -197,11 +218,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (demoMode) console.warn('topUpWallet is available only for demo mode. Real balances must be credited by a verified payment webhook.');
   };
 
+  const canUseTestMode = demoMode || currentUser.role === 'admin';
+  const isRolePreview = !demoMode && currentUser.role === 'admin' && testRole !== null && testRole !== 'admin';
+  const visibleUser = useMemo(
+    () => !demoMode && currentUser.role === 'admin' && testRole ? { ...currentUser, role: testRole } : currentUser,
+    [currentUser, demoMode, testRole]
+  );
+
   const value = useMemo(() => ({
-    currentUser, currentCreator, isAuthenticated, isAgeVerified: currentUser.age_verified && hasConsented18Plus,
+    currentUser: visibleUser, currentCreator, isAuthenticated, canUseTestMode, isRolePreview, testRole,
+    isAgeVerified: currentUser.age_verified && hasConsented18Plus,
     hasConsented18Plus, confirmAgeVerification, login, requestPasswordReset, updatePassword, register, logout, switchUserRole, switchUser,
     updateProfile, topUpWallet, allUsers
-  }), [currentUser, currentCreator, isAuthenticated, hasConsented18Plus, allUsers]);
+  }), [visibleUser, currentUser.age_verified, currentCreator, isAuthenticated, canUseTestMode, isRolePreview, testRole, hasConsented18Plus, allUsers]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

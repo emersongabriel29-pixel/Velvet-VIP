@@ -39,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAuthModal,
   onOpenLgpdModal
 }) => {
-  const { currentUser, switchUserRole, isAuthenticated } = useAuth();
+  const { currentUser, switchUserRole, isAuthenticated, canUseTestMode, isRolePreview } = useAuth();
   const {locale,setLocale,t}=useLocale();
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
 
@@ -164,7 +164,7 @@ export const Header: React.FC<HeaderProps> = ({
           <select aria-label="Idioma" value={locale} onChange={e=>setLocale(e.target.value as 'pt-BR'|'en-US')} className="rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-[10px] font-bold text-zinc-300"><option value="pt-BR">PT</option><option value="en-US">EN</option></select>
 
           {/* Role Switcher Dropdown (Allows testing as User, Creator, or Admin) */}
-          {isAuthenticated && <div className="relative">
+          {isAuthenticated && canUseTestMode && <div className="relative">
             <button
               id="header-role-switcher-btn"
               onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
@@ -178,7 +178,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <UserCheck className="w-3.5 h-3.5 text-sky-400" />
               )}
               <span className="capitalize hidden md:inline">
-                {currentUser.role === 'admin' ? 'Admin' : currentUser.role === 'creator' ? 'Criador' : 'Membro'}
+                {isRolePreview ? 'Teste: ' : ''}{currentUser.role === 'admin' ? 'Admin' : currentUser.role === 'creator' ? 'Criador' : 'Membro'}
               </span>
               <ChevronDown className="w-3 h-3 text-zinc-400" />
             </button>
@@ -197,7 +197,7 @@ export const Header: React.FC<HeaderProps> = ({
                     onClick={() => {
                       switchUserRole(r);
                       setRoleDropdownOpen(false);
-                      if (r === 'admin') onViewChange('admin');
+                      onViewChange(r === 'admin' ? 'admin' : r === 'creator' ? 'creator_studio' : 'profile');
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-colors text-left cursor-pointer ${
                       currentUser.role === r

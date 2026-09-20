@@ -8,6 +8,9 @@ const checkout=read('supabase/functions/create-checkout/index.ts');
 const auth=read('src/components/auth/AuthModalV2.tsx');
 const live=read('src/components/live/LivePage.tsx');
 const video=read('src/components/feed/VideoCard.tsx');
+const authContext=read('src/hooks/useAuth.tsx');
+const header=read('src/components/common/Header.tsx');
+const profile=read('src/components/profile/ProfileView.tsx');
 
 test('live engagement and paid offers are RLS protected',()=>{
   for(const table of ['live_likes','live_comments','live_shares','live_offers','live_offer_orders']){
@@ -32,4 +35,17 @@ test('Google OAuth, live engagement and Velvet watermarks are wired',()=>{
   assert.match(live,/VELVET/);
   assert.match(video,/showTips/);
   assert.match(video,/watermark_enabled/);
+});
+
+test('admin role preview works without changing the database role',()=>{
+  assert.match(authContext,/currentUser\.role !== 'admin'/);
+  assert.match(authContext,/sessionStorage\.setItem\(TEST_ROLE_KEY, role\)/);
+  assert.match(authContext,/database permissions are deliberately never changed/);
+  assert.match(header,/r === 'creator' \? 'creator_studio' : 'profile'/);
+});
+
+test('profile avatar is left aligned, raised and fully contained',()=>{
+  assert.match(profile,/absolute -bottom-8 left-5 sm:left-8/);
+  assert.match(profile,/rounded-full object-contain object-center/);
+  assert.doesNotMatch(profile,/rounded-3xl overflow-hidden bg-gradient-to-r/);
 });
