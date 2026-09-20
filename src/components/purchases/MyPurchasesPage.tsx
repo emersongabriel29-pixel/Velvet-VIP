@@ -1,19 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Play, Crown, CheckCircle2, Clock, XCircle, ArrowLeft } from 'lucide-react';
+import { ShoppingBag, Play, Crown, CheckCircle2, Clock, XCircle, ArrowLeft, Bookmark, History, Heart } from 'lucide-react';
 import { dbService } from '../../services/db';
 import { isDemoMode } from '../../lib/supabase';
 import { loadPurchases } from '../../services/accountData';
 import { useAuth } from '../../hooks/useAuth';
 import { Video, Subscription } from '../../types';
+import type { ProductTool } from '../product/ProductHub';
 
 interface MyPurchasesPageProps {
   onSelectVideo: (videoId: string) => void;
   onBack: () => void;
+  onOpenTool: (tool: ProductTool) => void;
 }
 
 export const MyPurchasesPage: React.FC<MyPurchasesPageProps> = ({
   onSelectVideo,
   onBack,
+  onOpenTool,
 }) => {
   const [activeTab, setActiveTab] = useState<'videos' | 'subscriptions'>('videos');
   const [purchasedVideos, setPurchasedVideos] = useState<Video[]>([]);
@@ -69,6 +72,15 @@ export const MyPurchasesPage: React.FC<MyPurchasesPageProps> = ({
           </p>
         </div>
       </div>
+
+      <section className="mb-6" aria-labelledby="personal-library-heading">
+        <h2 id="personal-library-heading" className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Minha biblioteca</h2>
+        <div className="grid grid-cols-3 gap-2">
+          <button type="button" onClick={()=>onOpenTool('saved')} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 text-left hover:border-rose-500/40"><Bookmark className="mb-2 h-4 w-4 text-rose-400"/><span className="text-xs font-bold">Salvos</span></button>
+          <button type="button" onClick={()=>onOpenTool('continue')} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 text-left hover:border-rose-500/40"><History className="mb-2 h-4 w-4 text-rose-400"/><span className="text-xs font-bold">Continuar</span></button>
+          <button type="button" onClick={()=>onOpenTool('wishlist')} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 text-left hover:border-rose-500/40"><Heart className="mb-2 h-4 w-4 text-rose-400"/><span className="text-xs font-bold">Lista PPV</span></button>
+        </div>
+      </section>
 
       {/* Tabs */}
       <div className="flex items-center gap-2 mb-6">

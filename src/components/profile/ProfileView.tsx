@@ -309,7 +309,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   className="px-3.5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <ShoppingBag className="w-4 h-4 text-amber-400" />
-                  <span>Minhas Compras</span>
+                  <span>Biblioteca e Compras</span>
                 </button>
 
                 <button

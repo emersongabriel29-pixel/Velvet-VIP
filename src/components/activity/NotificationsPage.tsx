@@ -16,11 +16,13 @@ import { useAuth } from '../../hooks/useAuth';
 interface NotificationsPageProps {
   onSelectVideo?: (videoId: string) => void;
   onSelectCreator?: (creatorId: string) => void;
+  onOpenMessages?: () => void;
 }
 
 export const NotificationsPage: React.FC<NotificationsPageProps> = ({
   onSelectVideo,
   onSelectCreator,
+  onOpenMessages,
 }) => {
   const { isAuthenticated, currentUser } = useAuth();
   const [error, setError] = useState('');
@@ -93,13 +95,12 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({
           <p className="text-xs text-zinc-400">{isAuthenticated ? 'Todas as novidades e atividades da sua conta aparecem aqui em uma única lista.' : 'Descubra conteúdos novos e criadores que você poderá seguir ao criar sua conta.'}</p>
         </div>
 
-        <button
-          onClick={handleMarkAllRead}
-          className="shrink-0 px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-        >
-          <CheckCheck className="w-3.5 h-3.5 text-zinc-400" />
-          <span className="hidden sm:inline">Marcar todas como lidas</span><span className="sm:hidden">Ler todas</span>
-        </button>
+        <div className="flex shrink-0 gap-2">
+          {isAuthenticated&&onOpenMessages&&<button onClick={onOpenMessages} className="flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-950/30 px-2.5 py-1.5 text-xs font-bold text-rose-300"><MessageSquare className="h-3.5 w-3.5"/><span>Mensagens</span></button>}
+          <button onClick={handleMarkAllRead} className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white">
+            <CheckCheck className="h-3.5 w-3.5 text-zinc-400"/><span className="hidden sm:inline">Marcar como lidas</span><span className="sm:hidden">Ler</span>
+          </button>
+        </div>
       </div>
 
       {/* Unified notification stream: no choice between content/creators. */}

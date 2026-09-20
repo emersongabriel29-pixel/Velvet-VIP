@@ -15,7 +15,9 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Star
+  Star,
+  Target,
+  Clapperboard
 } from 'lucide-react';
 import { Creator, Video, Withdrawal } from '../../types';
 import { dbService } from '../../services/db';
@@ -24,15 +26,18 @@ import { CreatorAnalyticsPanel } from './CreatorAnalyticsPanel';
 import { CreatorPlansManager } from './CreatorPlansManager';
 import { supabase, isSupabaseConfigured, isDemoMode } from '../../lib/supabase';
 import { uploadProfileImage, getProfileImageUrl } from '../../services/media';
+import type { ProductTool } from '../product/ProductHub';
 
 interface CreatorDashboardProps {
   onOpenUpload: () => void;
   onSelectVideo: (videoId: string) => void;
+  onOpenTool: (tool: ProductTool) => void;
 }
 
 export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
   onOpenUpload,
   onSelectVideo,
+  onOpenTool,
 }) => {
   const { currentCreator } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'videos' | 'highlights' | 'plans' | 'payouts'>('overview');
@@ -251,6 +256,11 @@ export const CreatorDashboard: React.FC<CreatorDashboardProps> = ({
       </div>
 
       <CreatorAnalyticsPanel creatorId={creator.id} fallback={{ followers: creator.total_followers, views: creator.total_views, likes: creator.total_likes, comments: 0, earnings: creator.total_earnings || 0 }} />
+
+      <section className="my-6 grid grid-cols-2 gap-3" aria-label="Ferramentas do criador">
+        <button type="button" onClick={()=>onOpenTool('goals')} className="flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 text-left hover:border-amber-500/40"><Target className="h-5 w-5 text-amber-400"/><span><span className="block text-sm font-bold">Metas</span><span className="text-xs text-zinc-500">Objetivos da comunidade</span></span></button>
+        <button type="button" onClick={()=>onOpenTool('clips')} className="flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 text-left hover:border-rose-500/40"><Clapperboard className="h-5 w-5 text-rose-400"/><span><span className="block text-sm font-bold">Clipes de lives</span><span className="text-xs text-zinc-500">Cortes das transmissões</span></span></button>
+      </section>
 
 
       {/* Navigation Tabs */}

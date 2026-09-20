@@ -17,6 +17,10 @@ const accountData=read('src/services/accountData.ts');
 const feed=read('src/components/feed/VideoFeed.tsx');
 const adBanner=read('src/components/ads/AdBanner.tsx');
 const admin=read('src/components/admin/AdminCommandCenter.tsx');
+const productHub=read('src/components/product/ProductHub.tsx');
+const purchasesPage=read('src/components/purchases/MyPurchasesPage.tsx');
+const notificationsPage=read('src/components/activity/NotificationsPage.tsx');
+const creatorDashboard=read('src/components/creator/CreatorDashboard.tsx');
 
 test('live engagement and paid offers are RLS protected',()=>{
   for(const table of ['live_likes','live_comments','live_shares','live_offers','live_offer_orders']){
@@ -88,4 +92,16 @@ test('feed renders active admin campaigns and recoverable loading errors',()=>{
   assert.doesNotMatch(adBanner,/Espaço reservado para anunciantes/);
   assert.match(admin,/<option value="banner">Banner<\/option>/);
   assert.doesNotMatch(admin,/<option value="stories">Stories<\/option>/);
+});
+
+test('mobile shortcuts live in their natural product areas',()=>{
+  for(const duplicate of ['Agenda de lives','Lista PPV','Clipes de lives','Status operacional']) assert.doesNotMatch(productHub,new RegExp(duplicate));
+  for(const libraryItem of ["onOpenTool('saved')","onOpenTool('continue')","onOpenTool('wishlist')"]) assert.match(purchasesPage,new RegExp(libraryItem.replace(/[()']/g,'\\$&')));
+  assert.match(explore,/onOpenTool\('premieres'\)/);
+  assert.match(explore,/onOpenTool\('bundles'\)/);
+  assert.match(explore,/onOpenTool\('coupons'\)/);
+  assert.match(notificationsPage,/onOpenMessages/);
+  assert.match(creatorDashboard,/onOpenTool\('goals'\)/);
+  assert.match(creatorDashboard,/onOpenTool\('clips'\)/);
+  assert.match(admin,/\['overview','Status operacional'/);
 });
