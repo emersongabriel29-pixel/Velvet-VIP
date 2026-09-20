@@ -14,7 +14,6 @@ import {
   LayoutDashboard,
   ShieldCheck,
   Wallet,
-  Scale,
   LogIn,
   Camera,
   Share2,
@@ -35,7 +34,6 @@ interface ProfileViewProps {
   onOpenMyPurchases: () => void;
   onOpenWallet: () => void;
   onOpenUpload: () => void;
-  onOpenLgpd?: () => void;
   onOpenAuth?: () => void;
   onOpenLive?: (liveId?: string) => void;
 }
@@ -47,7 +45,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenMyPurchases,
   onOpenWallet,
   onOpenUpload,
-  onOpenLgpd,
   onOpenAuth,
   onOpenLive,
 }) => {
@@ -353,17 +350,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   >
                     <Plus className="w-4 h-4" />
                     <span>Postar Vídeo</span>
-                  </button>
-                )}
-
-                {onOpenLgpd && (
-                  <button
-                    onClick={onOpenLgpd}
-                    className="px-3.5 py-2.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-500/30 text-emerald-300 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                    title="Seus Direitos e Dados Pessoais (LGPD Art. 18)"
-                  >
-                    <Scale className="w-4 h-4 text-emerald-400" />
-                    <span>LGPD & Dados</span>
                   </button>
                 )}
 
