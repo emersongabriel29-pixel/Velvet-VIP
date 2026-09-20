@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bell, BookOpen, Compass, HelpCircle, LayoutDashboard, LogIn, Scale, ShieldAlert, User } from 'lucide-react';
+import { Bell, BookOpen, Compass, HelpCircle, LayoutDashboard, LogIn, Package, Scale, ShieldAlert, TicketPercent, User } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 export type ProductTool='search'|'saved'|'continue'|'live_schedule'|'messages'|'wishlist'|'bundles'|'coupons'|'premieres'|'support'|'goals'|'clips'|'operations';
@@ -25,7 +25,9 @@ export const ProductHub:React.FC<ProductHubProps>=({onOpen,onNavigate,onOpenLgpd
   ]});
 
   sections.push({title:'Descobrir',items:[
-    {id:'explore',title:'Explorar',subtitle:'Busca, criadores, lives e estreias',icon:Compass,action:()=>onNavigate('explore')},
+    {id:'explore',title:'Explorar',subtitle:'Busca, criadores, vídeos, lives e estreias',icon:Compass,action:()=>onNavigate('explore')},
+    {id:'bundles',title:'Pacotes',subtitle:'Conteúdos reunidos em ofertas especiais',icon:Package,action:()=>onOpen('bundles')},
+    {id:'coupons',title:'Cupons',subtitle:'Descontos e benefícios disponíveis',icon:TicketPercent,action:()=>onOpen('coupons')},
   ]});
 
   if(currentUser.role==='creator'&&currentCreator?.is_approved) sections.push({title:'Criador',items:[
