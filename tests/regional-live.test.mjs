@@ -98,8 +98,10 @@ test('mobile shortcuts live in their natural product areas',()=>{
   for(const duplicate of ['Agenda de lives','Lista PPV','Clipes de lives','Status operacional']) assert.doesNotMatch(productHub,new RegExp(duplicate));
   for(const libraryItem of ["onOpenTool('saved')","onOpenTool('continue')","onOpenTool('wishlist')"]) assert.match(purchasesPage,new RegExp(libraryItem.replace(/[()']/g,'\\$&')));
   assert.match(explore,/onOpenTool\('premieres'\)/);
-  assert.match(explore,/onOpenTool\('bundles'\)/);
-  assert.match(explore,/onOpenTool\('coupons'\)/);
+  assert.doesNotMatch(explore,/onOpenTool\('bundles'\)/);
+  assert.doesNotMatch(explore,/onOpenTool\('coupons'\)/);
+  assert.match(productHub,/onOpen\('bundles'\)/);
+  assert.match(productHub,/onOpen\('coupons'\)/);
   assert.match(notificationsPage,/onOpenMessages/);
   assert.match(creatorDashboard,/onOpenTool\('goals'\)/);
   assert.match(creatorDashboard,/onOpenTool\('clips'\)/);
