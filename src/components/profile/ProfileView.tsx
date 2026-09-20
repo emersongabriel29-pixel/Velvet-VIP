@@ -181,13 +181,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     try { if(navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(url); alert('Link do perfil copiado.'); } } catch {}
   };
 
-  // Filter videos according to tab
-  const displayedVideos = videos.filter((v) => {
+  // Filter videos according to tab. On shared creator profiles, free previews
+  // lead the catalog so visitors can discover the creator before subscribing.
+  const filteredVideos = videos.filter((v) => {
     if (activeTab === 'free') return !v.is_premium;
     if (activeTab === 'vip') return v.is_premium;
     if (activeTab === 'long') return v.content_kind === 'long' || v.duration_seconds >= 60;
     return true;
   });
+  const displayedVideos = activeTab === 'all'
+    ? [...filteredVideos].sort((a, b) => Number(a.is_premium) - Number(b.is_premium))
+    : filteredVideos;
+  const freeVideoCount = videos.filter(v => !v.is_premium).length;
+  const vipVideoCount = videos.filter(v => v.is_premium).length;
+  const firstFreeVideo = videos.find(v => !v.is_premium);
+  const creatorDisplayName = creator?.display_name || currentUser.name;
+  const isSharedCreatorProfile = Boolean(creator && !isOwnProfile);
 
   const isVipMember=!creator && currentUser.platform_plan_slug==='vip';
   const pageTitle=creator?pageCopy.creator_title:(isVipMember?pageCopy.vip_title:pageCopy.member_title);
@@ -221,7 +230,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-white pt-14 pb-20 max-w-4xl mx-auto px-3 sm:px-6"><div className="mb-4 rounded-2xl border border-rose-500/20 bg-rose-950/10 px-4 py-3"><p className="text-sm font-black text-white">{pageTitle}</p><p className="mt-1 text-xs text-zinc-400">{pageSubtitle}</p></div>
+    <div className="min-h-screen bg-[#09090b] text-white pt-14 pb-20 max-w-4xl mx-auto px-3 sm:px-6">
+      {!isSharedCreatorProfile && <div className="mb-4 rounded-2xl border border-rose-500/20 bg-rose-950/10 px-4 py-3"><p className="text-sm font-black text-white">{pageTitle}</p><p className="mt-1 text-xs text-zinc-400">{pageSubtitle}</p></div>}
+      {isSharedCreatorProfile && <div className="mb-3 flex items-center justify-between gap-3 px-1"><div><p className="text-[10px] font-black uppercase tracking-[.2em] text-rose-400">Perfil de criador</p><p className="mt-0.5 text-xs text-zinc-500">Conteúdos gratuitos, exclusivos, lives e destaques.</p></div><span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold text-emerald-300">Verificado 18+</span></div>}
       {/* Cover Banner */}
       <div className="relative h-44 sm:h-56 rounded-3xl bg-gradient-to-r from-rose-950/60 via-zinc-900 to-amber-950/40 border border-zinc-800 shadow-xl mb-12">
         {coverPreview && (
@@ -285,7 +296,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </h1>
             <p className="text-sm text-zinc-400">
               @{creator?.handle || currentUser.username} •{' '}
-              <span className="text-zinc-500 capitalize">{currentUser.role}</span>
+              <span className="text-zinc-500 capitalize">{creator ? 'Criador' : currentUser.role}</span>
             </p>
           </div>
 
@@ -435,6 +446,36 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
       {selectedHighlight&&<div onClick={()=>setSelectedHighlight(null)} className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"><div onClick={e=>e.stopPropagation()} className="w-full max-w-lg overflow-hidden rounded-3xl border border-zinc-800 bg-[#111116] shadow-2xl">{selectedHighlight.media_type==='video'?<video src={selectedHighlight.display_url} controls autoPlay playsInline className="max-h-[70vh] w-full bg-black object-contain"/>:<img src={selectedHighlight.display_url} alt={selectedHighlight.title} className="max-h-[70vh] w-full bg-black object-contain"/>}<div className="flex items-center justify-between gap-3 p-4"><div><p className="text-[10px] font-bold uppercase tracking-[.2em] text-rose-400">Destaque</p><h3 className="font-bold">{selectedHighlight.title}</h3></div><button onClick={()=>setSelectedHighlight(null)} className="rounded-xl border border-zinc-700 px-3 py-2 text-xs font-bold">Fechar</button></div></div></div>}
 
+      {isSharedCreatorProfile && (
+        <section id="creator-content" className="mb-5 overflow-hidden rounded-3xl border border-rose-500/25 bg-gradient-to-br from-rose-950/35 via-zinc-900 to-amber-950/20 p-4 shadow-lg shadow-rose-950/10 sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[.2em] text-rose-400">Conteúdo de {creatorDisplayName}</p>
+              <h2 className="mt-1 text-xl font-black text-white">Comece pelos vídeos gratuitos</h2>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">Conheça o conteúdo antes de assinar. Os exclusivos continuam protegidos para membros.</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold">
+                <span className="rounded-full bg-white/10 px-2.5 py-1 text-white">{freeVideoCount} gratuitos</span>
+                <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-amber-300">{vipVideoCount} exclusivos</span>
+                {profileLives.some(l => l.status === 'live') && <span className="rounded-full bg-rose-600 px-2.5 py-1 text-white">AO VIVO AGORA</span>}
+              </div>
+            </div>
+            {firstFreeVideo ? (
+              <button type="button" onClick={() => onSelectVideo(firstFreeVideo.id)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-rose-600 to-amber-500 px-5 py-3 text-sm font-black text-white shadow-lg shadow-rose-950/40 transition hover:brightness-110 active:scale-[.98]">
+                <Play className="h-4 w-4 fill-white" />
+                Assistir grátis
+              </button>
+            ) : vipVideoCount > 0 ? (
+              <button type="button" onClick={() => setActiveTab('vip')} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-5 py-3 text-sm font-black text-amber-300">
+                <Crown className="h-4 w-4 fill-amber-300" />
+                Ver exclusivos
+              </button>
+            ) : null}
+          </div>
+        </section>
+      )}
+
+      {creator && <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em] text-zinc-500">Catálogo</p><h2 className="text-lg font-black text-white">Todos os conteúdos</h2></div><span className="text-xs text-zinc-500">{videos.length} publicações</span></div>}
+
       {/* Profile Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto border-b border-zinc-800 pb-3 mb-4">
         <button
@@ -506,24 +547,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               {/* Gradient Overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
 
-              {/* VIP Badge */}
-              {v.is_premium && (
-                <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-amber-500/80 backdrop-blur-md text-zinc-950 text-[10px] font-black uppercase flex items-center gap-1 shadow">
-                  <Lock className="w-2.5 h-2.5" />
-                  <span>VIP</span>
-                </div>
-              )}
-
-              {/* Views Count */}
-              <div className="absolute bottom-2 left-2 flex items-center gap-1 text-[11px] font-semibold text-white filter drop-shadow">
-                <Play className="w-3 h-3 fill-white" />
-                <span>{v.views_count > 1000 ? `${(v.views_count / 1000).toFixed(1)}k` : v.views_count}</span>
+              {/* Access badge */}
+              <div className={`absolute top-2 left-2 rounded-md px-2 py-0.5 text-[10px] font-black uppercase shadow backdrop-blur-md ${v.is_premium ? 'bg-amber-500/90 text-zinc-950' : 'bg-emerald-500/90 text-zinc-950'}`}>
+                <span className="flex items-center gap-1">{v.is_premium ? <><Lock className="h-2.5 w-2.5" /> VIP</> : <><Play className="h-2.5 w-2.5 fill-zinc-950" /> GRÁTIS</>}</span>
               </div>
 
-              {/* Likes Count */}
-              <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[11px] font-semibold text-zinc-300 filter drop-shadow">
-                <Heart className="w-3 h-3 fill-rose-500 text-rose-500" />
-                <span>{v.likes_count > 1000 ? `${(v.likes_count / 1000).toFixed(1)}k` : v.likes_count}</span>
+              {(v.content_kind === 'long' || v.duration_seconds >= 60) && <div className="absolute right-2 top-2 rounded-md bg-black/65 px-2 py-0.5 text-[9px] font-black uppercase text-white backdrop-blur-md">Vídeo longo</div>}
+
+              <div className="absolute inset-x-2 bottom-2">
+                <p className="mb-1.5 line-clamp-2 text-xs font-black leading-tight text-white drop-shadow-md">{v.title}</p>
+                <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-200">
+                  <span className="flex items-center gap-1"><Play className="h-3 w-3 fill-white text-white" />{v.views_count > 1000 ? `${(v.views_count / 1000).toFixed(1)}k` : v.views_count}</span>
+                  <span className="flex items-center gap-1"><Heart className="h-3 w-3 fill-rose-500 text-rose-500" />{v.likes_count > 1000 ? `${(v.likes_count / 1000).toFixed(1)}k` : v.likes_count}</span>
+                </div>
               </div>
             </div>
           ))}
