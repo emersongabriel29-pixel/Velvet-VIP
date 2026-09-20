@@ -23,7 +23,8 @@ npm run dev
 Copie `.env.example` para `.env.local` e preencha:
 
 - `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+- `VITE_SUPABASE_PUBLISHABLE_KEY` (recomendado para o frontend)
+- `VITE_SUPABASE_ANON_KEY` (compatibilidade com projetos legados)
 - `APP_URL`
 - `GEMINI_API_KEY` somente se as funções de IA forem utilizadas
 

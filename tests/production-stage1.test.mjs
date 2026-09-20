@@ -33,6 +33,14 @@ test('legacy webhook requires HMAC freshness and amount integrity',()=>{
 test('production backend configuration fails closed',()=>{
   assert.match(supabaseClient,/productionBuild && !isSupabaseConfigured && !explicitDemoMode/);
 });
+test('frontend accepts the current publishable key and keeps legacy anon compatibility',()=>{
+  assert.match(supabaseClient,/VITE_SUPABASE_PUBLISHABLE_KEY/);
+  assert.match(supabaseClient,/VITE_SUPABASE_ANON_KEY/);
+  const productionEnv=read('.env.production');
+  assert.match(productionEnv,/VITE_SUPABASE_URL=https:\/\/[^\s]+\.supabase\.co/);
+  assert.match(productionEnv,/VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_/);
+  assert.doesNotMatch(productionEnv,/service_role|sb_secret_/i);
+});
 test('local database consumers are explicitly restricted to demo mode',()=>{
   const files=fs.readdirSync('src',{recursive:true}).filter(name=>/\.(ts|tsx)$/.test(name));
   for(const name of files){
