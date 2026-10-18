@@ -74,3 +74,12 @@ test('production webhook is the only canonical settlement path',()=>{
   assert.match(canonical,/paymentResponse\?\.ok/);
   assert.match(canonical,/AbortSignal\.timeout\(15000\)/);
 });
+
+
+test('self-declared birth date never grants verified-age status',()=>{
+  const migration=fs.readFileSync('supabase/migrations/20261018000000_age_verification_fail_closed.sql','utf8');
+  assert.match(migration,/set age_verified = false/i);
+  assert.match(migration,/values\s*\([\s\S]*?safe_role, false, null\)/i);
+  assert.match(migration,/user-supplied birth date is not verification/i);
+  assert.doesNotMatch(migration,/safe_role, TRUE, NOW\(\)/i);
+});
