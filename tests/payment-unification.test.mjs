@@ -33,3 +33,18 @@ test('Mercado Pago webhook accepts second or millisecond timestamps and normaliz
   assert.match(webhook,/if\(requestId\)manifest\.push/);
   assert.match(webhook,/if\(tsRaw\)manifest\.push/);
 });
+
+test('legacy webhook records payment events only after provider and local lookup succeed',()=>{
+  const legacy=fs.readFileSync('supabase/functions/mercadopago-webhook/index.ts','utf8');
+  const providerLookup=legacy.indexOf('const mpResponse = await fetch');
+  const eventInsert=legacy.indexOf("const inserted = await admin.from('webhook_events').insert", providerLookup);
+  assert.ok(providerLookup >= 0, 'provider lookup exists');
+  assert.ok(eventInsert > providerLookup, 'payment idempotency marker is written after provider lookup');
+  assert.match(legacy,/if \(!dbPayment\) return new Response\('Payment record not found', \{ status: 404 \}\);[\s\S]*?const inserted = await admin\.from\('webhook_events'\)\.insert/);
+});
+
+test('lockfile pins patched source-map-js release',()=>{
+  const lock=JSON.parse(fs.readFileSync('package-lock.json','utf8'));
+  assert.equal(lock.packages['node_modules/source-map-js']?.version,'1.2.2');
+  assert.match(lock.packages['node_modules/source-map-js']?.resolved || '',/source-map-js-1\.2\.2\.tgz$/);
+});
