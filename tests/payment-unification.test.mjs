@@ -33,3 +33,53 @@ test('Mercado Pago webhook accepts second or millisecond timestamps and normaliz
   assert.match(webhook,/if\(requestId\)manifest\.push/);
   assert.match(webhook,/if\(tsRaw\)manifest\.push/);
 });
+
+test('legacy webhook records payment events only after provider and local lookup succeed',()=>{
+  const legacy=fs.readFileSync('supabase/functions/mercadopago-webhook/index.ts','utf8');
+  const providerLookup=legacy.indexOf('const mpResponse = await fetch');
+  const eventInsert=legacy.indexOf("const inserted = await admin.from('webhook_events').insert", providerLookup);
+  assert.ok(providerLookup >= 0, 'provider lookup exists');
+  assert.ok(eventInsert > providerLookup, 'payment idempotency marker is written after provider lookup');
+  assert.match(legacy,/if \(!dbPayment\) return new Response\('Payment record not found', \{ status: 404 \}\);[\s\S]*?const inserted = await admin\.from\('webhook_events'\)\.insert/);
+});
+
+test('lockfile pins patched source-map-js release',()=>{
+  const lock=JSON.parse(fs.readFileSync('package-lock.json','utf8'));
+  assert.equal(lock.packages['node_modules/source-map-js']?.version,'1.2.2');
+  assert.match(lock.packages['node_modules/source-map-js']?.resolved || '',/source-map-js-1\.2\.2\.tgz$/);
+});
+
+
+test('production environment file contains only browser-safe configuration',()=>{
+  const envExample=fs.readFileSync('.env.example','utf8');
+  assert.equal((envExample.match(/^VITE_DEMO_MODE=/gm)||[]).length,1);
+  assert.match(envExample,/SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(envExample,/never in VITE_/i);
+  const productionEnv=fs.readFileSync('.env.production','utf8');
+  assert.match(productionEnv,/^VITE_SUPABASE_URL=/m);
+  assert.match(productionEnv,/^VITE_SUPABASE_PUBLISHABLE_KEY=/m);
+  assert.doesNotMatch(productionEnv,/SUPABASE_SERVICE_ROLE_KEY|MERCADOPAGO_ACCESS_TOKEN|MERCADOPAGO_WEBHOOK_SECRET|GEMINI_API_KEY/i);
+  const allowedKeys=new Set(['VITE_SUPABASE_URL','VITE_SUPABASE_PUBLISHABLE_KEY','VITE_DEMO_MODE']);
+  for(const line of productionEnv.split(/\\r?\\n/)){
+    if(!line.trim()||line.trim().startsWith('#')) continue;
+    const key=line.split('=',1)[0];
+    assert.ok(allowedKeys.has(key),`unexpected production env key: ${key}`);
+  }
+});
+
+test('production webhook is the only canonical settlement path',()=>{
+  const canonical=fs.readFileSync('supabase/functions/payment-webhook/index.ts','utf8');
+  assert.match(canonical,/rpc\('settle_verified_payment'/);
+  assert.match(canonical,/payload\.data\?\.id/);
+  assert.match(canonical,/paymentResponse\?\.ok/);
+  assert.match(canonical,/AbortSignal\.timeout\(15000\)/);
+});
+
+
+test('self-declared birth date never grants verified-age status',()=>{
+  const migration=fs.readFileSync('supabase/migrations/20261018000000_age_verification_fail_closed.sql','utf8');
+  assert.match(migration,/set age_verified = false/i);
+  assert.match(migration,/values\s*\([\s\S]*?safe_role, false, null\)/i);
+  assert.match(migration,/user-supplied birth date is not verification/i);
+  assert.doesNotMatch(migration,/safe_role, TRUE, NOW\(\)/i);
+});
