@@ -28,3 +28,16 @@ jobs:
           if git grep -nE '(sk_live_[A-Za-z0-9]{16,}|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY)' -- ':!package-lock.json' ':!SECURITY*' ':!.github/workflows/security.yml'; then
             echo 'Potential secret committed to repository'; exit 1
           fi
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan repository history for leaked secrets
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
