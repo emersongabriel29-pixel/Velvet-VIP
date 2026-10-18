@@ -53,7 +53,7 @@ Status operacional: [`PRODUCTION_STATUS.md`](./PRODUCTION_STATUS.md)
 
 A segunda migração endurece RLS e impede alterações client-side em campos financeiros/administrativos. A terceira cria o provisionamento de perfil após signup, ledger financeiro, idempotência de webhooks, auditoria e bucket privado de mídia.
 
-O signup real exige data de nascimento de maioridade; a trigger de banco valida 18+ antes de criar o perfil.
+O signup real exige data de nascimento de maioridade, mas essa informação é autodeclarada e não comprova identidade. A migration `20261018000000_age_verification_fail_closed.sql` remove a aprovação automática e bloqueia conteúdo adulto até existir verificação confiável. **Não lançar publicamente** até integrar e testar o provedor de verificação de idade/identidade e seu callback assinado.
 
 ## Edge Functions
 
