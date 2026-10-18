@@ -48,3 +48,23 @@ test('lockfile pins patched source-map-js release',()=>{
   assert.equal(lock.packages['node_modules/source-map-js']?.version,'1.2.2');
   assert.match(lock.packages['node_modules/source-map-js']?.resolved || '',/source-map-js-1\.2\.2\.tgz$/);
 });
+
+
+test('environment files containing deployment secrets stay ignored',()=>{
+  const ignore=fs.readFileSync('.gitignore','utf8');
+  assert.match(ignore,/^\\.env\*$/m);
+  assert.match(ignore,/^!\\.env\.example$/m);
+  assert.doesNotMatch(ignore,/^!\\.env\.production$/m);
+  const envExample=fs.readFileSync('.env.example','utf8');
+  assert.equal((envExample.match(/^VITE_DEMO_MODE=/gm)||[]).length,1);
+  assert.match(envExample,/SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(envExample,/never in VITE_/i);
+});
+
+test('production webhook is the only canonical settlement path',()=>{
+  const canonical=fs.readFileSync('supabase/functions/payment-webhook/index.ts','utf8');
+  assert.match(canonical,/rpc\('settle_verified_payment'/);
+  assert.match(canonical,/payload\.data\?\.id/);
+  assert.match(canonical,/paymentResponse\?\.ok/);
+  assert.match(canonical,/AbortSignal\.timeout\(15000\)/);
+});
