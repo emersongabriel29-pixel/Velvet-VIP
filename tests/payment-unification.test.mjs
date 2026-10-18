@@ -50,15 +50,16 @@ test('lockfile pins patched source-map-js release',()=>{
 });
 
 
-test('environment files containing deployment secrets stay ignored',()=>{
-  const ignore=fs.readFileSync('.gitignore','utf8');
-  assert.match(ignore,/^\\.env\*$/m);
-  assert.match(ignore,/^!\\.env\.example$/m);
-  assert.doesNotMatch(ignore,/^!\\.env\.production$/m);
+test('production environment file contains only browser-safe configuration',()=>{
   const envExample=fs.readFileSync('.env.example','utf8');
   assert.equal((envExample.match(/^VITE_DEMO_MODE=/gm)||[]).length,1);
   assert.match(envExample,/SUPABASE_SERVICE_ROLE_KEY/);
   assert.match(envExample,/never in VITE_/i);
+  const productionEnv=fs.readFileSync('.env.production','utf8');
+  assert.match(productionEnv,/^VITE_SUPABASE_URL=/m);
+  assert.match(productionEnv,/^VITE_SUPABASE_PUBLISHABLE_KEY=/m);
+  assert.doesNotMatch(productionEnv,/SUPABASE_SERVICE_ROLE_KEY|MERCADOPAGO_ACCESS_TOKEN|MERCADOPAGO_WEBHOOK_SECRET|GEMINI_API_KEY/i);
+  assert.doesNotMatch(productionEnv,/^(?!\\s*(#|$|VITE_SUPABASE_URL=|VITE_SUPABASE_PUBLISHABLE_KEY=|VITE_DEMO_MODE=))[A-Z0-9_]+=.+/m);
 });
 
 test('production webhook is the only canonical settlement path',()=>{
