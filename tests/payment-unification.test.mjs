@@ -59,7 +59,12 @@ test('production environment file contains only browser-safe configuration',()=>
   assert.match(productionEnv,/^VITE_SUPABASE_URL=/m);
   assert.match(productionEnv,/^VITE_SUPABASE_PUBLISHABLE_KEY=/m);
   assert.doesNotMatch(productionEnv,/SUPABASE_SERVICE_ROLE_KEY|MERCADOPAGO_ACCESS_TOKEN|MERCADOPAGO_WEBHOOK_SECRET|GEMINI_API_KEY/i);
-  assert.doesNotMatch(productionEnv,/^(?!\\s*(#|$|VITE_SUPABASE_URL=|VITE_SUPABASE_PUBLISHABLE_KEY=|VITE_DEMO_MODE=))[A-Z0-9_]+=.+/m);
+  const allowedKeys=new Set(['VITE_SUPABASE_URL','VITE_SUPABASE_PUBLISHABLE_KEY','VITE_DEMO_MODE']);
+  for(const line of productionEnv.split(/\\r?\\n/)){
+    if(!line.trim()||line.trim().startsWith('#')) continue;
+    const key=line.split('=',1)[0];
+    assert.ok(allowedKeys.has(key),`unexpected production env key: ${key}`);
+  }
 });
 
 test('production webhook is the only canonical settlement path',()=>{
