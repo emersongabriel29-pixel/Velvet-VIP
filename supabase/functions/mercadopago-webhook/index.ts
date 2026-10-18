@@ -15,14 +15,35 @@ Deno.serve(async (req) => {
   const expected = await hmac(secret, `${manifestParts.join(';')};`); if (!parts.v1 || !timingSafeEqual(expected, parts.v1)) return new Response('Invalid signature', { status: 401 });
   const body = await req.json().catch(() => ({})), eventId = String(body.id || dataId || crypto.randomUUID());
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-  const inserted = await admin.from('webhook_events').insert({ provider: 'mercadopago', external_event_id: eventId, event_type: body.type || body.action || null, payload: body });
-  if (inserted.error?.code === '23505') return new Response('ok', { status: 200 }); if (inserted.error) return new Response('Webhook storage failed', { status: 500 });
-  if (body.type !== 'payment' || !dataId) { await admin.from('webhook_events').update({ processed_at: new Date().toISOString() }).eq('provider', 'mercadopago').eq('external_event_id', eventId); return new Response('ok', { status: 200 }); }
-  const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(dataId)}`, { headers: { Authorization: `Bearer ${mpToken}` } }); const payment = await mpResponse.json().catch(() => null);
-  if (!mpResponse.ok || !payment) return new Response('Payment lookup failed', { status: 502 });
-  const reference = String(payment.external_reference || ''), [kind, itemId, userId] = reference.split(':'); if (!userId || !kind) return new Response('ok', { status: 200 });
+  // Non-payment notifications can be acknowledged without a provider lookup.
+  if (body.type !== 'payment' || !dataId) {
+    const inserted = await admin.from('webhook_events').insert({ provider: 'mercadopago', external_event_id: eventId, event_type: body.type || body.action || null, payload: body });
+    if (inserted.error?.code === '23505') return new Response('ok', { status: 200 });
+    if (inserted.error) return new Response('Webhook storage failed', { status: 500 });
+    await admin.from('webhook_events').update({ processed_at: new Date().toISOString() }).eq('provider', 'mercadopago').eq('external_event_id', eventId);
+    return new Response('ok', { status: 200 });
+  }
+
+  // Do not persist the idempotency marker until the provider lookup succeeds:
+  // a transient Mercado Pago outage must remain retryable.
+  const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(dataId)}`, { headers: { Authorization: `Bearer ${mpToken}` } }).catch(() => null);
+  const payment = mpResponse?.ok ? await mpResponse.json().catch(() => null) : null;
+  if (!mpResponse?.ok || !payment) return new Response('Payment lookup failed', { status: 502 });
+  const reference = String(payment.external_reference || ''), [kind, itemId, userId] = reference.split(':');
+  if (!userId || !kind) {
+    const inserted = await admin.from('webhook_events').insert({ provider: 'mercadopago', external_event_id: eventId, event_type: body.type || body.action || null, payload: body });
+    if (inserted.error?.code === '23505') return new Response('ok', { status: 200 });
+    if (inserted.error) return new Response('Webhook storage failed', { status: 500 });
+    await admin.from('webhook_events').update({ processed_at: new Date().toISOString() }).eq('provider', 'mercadopago').eq('external_event_id', eventId);
+    return new Response('ok', { status: 200 });
+  }
   const status = payment.status === 'approved' ? 'paid' : payment.status === 'rejected' || payment.status === 'cancelled' ? 'failed' : 'pending';
-  const { data: dbPayment } = await admin.from('payments').select('id,amount,status').eq('user_id', userId).eq('payment_gateway_id', reference).maybeSingle(); if (!dbPayment) return new Response('Payment record not found', { status: 404 });
+  const { data: dbPayment } = await admin.from('payments').select('id,amount,status').eq('user_id', userId).eq('payment_gateway_id', reference).maybeSingle();
+  if (!dbPayment) return new Response('Payment record not found', { status: 404 });
+  // Record the event only after both external and local payment lookups succeeded.
+  const inserted = await admin.from('webhook_events').insert({ provider: 'mercadopago', external_event_id: eventId, event_type: body.type || body.action || null, payload: body });
+  if (inserted.error?.code === '23505') return new Response('ok', { status: 200 });
+  if (inserted.error) return new Response('Webhook storage failed', { status: 500 });
   const providerAmount = Number(payment.transaction_amount);
   const expectedAmount = Number(dbPayment.amount);
   const currency = String(payment.currency_id || '');
